@@ -73,7 +73,6 @@ try:
                         f[row_id_visibility_type] = ''
                     if (r[row_id_visibility_type] != f[row_id_visibility_type]):
                         sql = "UPDATE metabase_field SET visibility_type = %s WHERE table_id = %s AND name = %s"
-                        print(sql)
                         with connection.cursor() as cursor_update:
                             cursor_update.execute(sql, (
                                     r[row_id_visibility_type],
@@ -81,13 +80,12 @@ try:
                                     r[2]
                                 ))
                             connection.commit()
-                            print("%s:%s/%s visibility_type changed (%s -> %s)\n" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_visibility_type], r[row_id_visibility_type]));
+                            print("%s:%s/%s visibility_type changed (%s -> %s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_visibility_type], r[row_id_visibility_type]));
 
                     if f[row_id_custom_position] == None:
                         f[row_id_custom_position] = ''
                     if (r[row_id_custom_position] and r[row_id_custom_position] != f[row_id_custom_position]):
                         sql = "UPDATE metabase_field SET custom_position = %s WHERE table_id = %s AND name = %s"
-                        print(sql)
                         with connection.cursor() as cursor_update:
                             cursor_update.execute(sql, (
                                     r[row_id_custom_position],
@@ -95,7 +93,7 @@ try:
                                     r[row_id_field_name]
                                 ))
                             connection.commit()
-                            print("%s:%s/%s custom_position changed (%s -> %s)\n" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_custom_position], r[row_id_custom_position]));
+                            print("%s:%s/%s custom_position changed (%s -> %s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_custom_position], r[row_id_custom_position]));
 
                     if f[row_id_semantic_type] == None:
                         f[row_id_semantic_type] = ''
@@ -113,7 +111,7 @@ try:
                                     r[row_id_field_name]
                                 ))
                             connection.commit()
-                            print("%s:%s/%s semantic_type changed (%s:%s/%s -> %s:%s/%s)\n" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_semantic_type], f[row_id_foreign_table], f[row_id_foreign_field], r[row_id_semantic_type], r[row_id_foreign_table], r[row_id_foreign_field]));
+                            print("%s:%s/%s semantic_type changed (%s:%s/%s -> %s:%s/%s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_semantic_type], f[row_id_foreign_table], f[row_id_foreign_field], r[row_id_semantic_type], r[row_id_foreign_table], r[row_id_foreign_field]));
                             continue;
                     if f[row_id_semantic_type] != r[row_id_semantic_type]:
                         sql = "UPDATE metabase_field SET semantic_type = %s WHERE table_id = %s AND name = %s"
@@ -124,7 +122,7 @@ try:
                                     r[row_id_field_name]
                                 ))
                             connection.commit()
-                            print("%s:%s/%s semantic_type changed (%s -> %s)\n" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_semantic_type], r[row_id_semantic_type]));
+                            print("%s:%s/%s semantic_type changed (%s -> %s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_semantic_type], r[row_id_semantic_type]));
                     
                 except KeyError:
                     continue
