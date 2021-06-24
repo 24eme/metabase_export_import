@@ -82,6 +82,19 @@ try:
                             connection.commit()
                             print("%s:%s/%s visibility_type changed (%s -> %s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_visibility_type], r[row_id_visibility_type]));
 
+                    if f[row_id_has_field_values] == None:
+                        f[row_id_has_field_values] = ''
+                    if (r[row_id_has_field_values] and r[row_id_has_field_values] != f[row_id_has_field_values]):
+                        sql = "UPDATE metabase_field SET has_field_values = %s WHERE table_id = %s AND name = %s"
+                        with connection.cursor() as cursor_update:
+                            cursor_update.execute(sql, (
+                                    r[row_id_has_field_values],
+                                    int(table_ids[r[row_id_database_name]+'-'+r[row_id_table_name]]),
+                                    r[row_id_field_name]
+                                ))
+                            connection.commit()
+                            print("%s:%s/%s has_field_values changed (%s -> %s)" % (r[row_id_database_name], r[row_id_table_name], r[row_id_field_name], f[row_id_has_field_values], r[row_id_has_field_values]));
+
                     if f[row_id_custom_position] == None:
                         f[row_id_custom_position] = ''
                     if (r[row_id_custom_position] and r[row_id_custom_position] != f[row_id_custom_position]):
