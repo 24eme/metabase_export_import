@@ -1,6 +1,7 @@
 import sys
 import requests
 import json
+import csv
 
 metabase_apiurl = sys.argv[1]
 metabase_username = sys.argv[2]
@@ -151,11 +152,45 @@ class Metabase:
         self.query('DELETE', 'session', {'metabase-session-id': self.metabase_session})
         self.metabase_session = None
 
+    def fieldid2tableandfield(self, database_export, field_id):
+        if not field_id:
+            return ['', '']
+        for table in database_export['tables']:
+            for field in table['fields']:
+                if field['id'] == field_id:
+                    return [table['name'], field['name']]
+        return ['', '']
+
+    def export_fields(self, database_name):
+        database_export = self.get_database(database_name, True)
+        result = []
+        for table in database_export['tables']:
+            table_name = table['name']
+            for field in table['fields']:
+                field_id = field['fk_target_field_id']
+                [fk_table, fk_field] = self.fieldid2tableandfield(database_export, field_id)
+                result.append({
+                                'database_name': database_name, 'table_name': table_name,
+                                'field_name': field['name'], 'semantic_type': str(field['semantic_type']),
+                                'foreign_table': fk_table, 'foreign_field': fk_field,
+                                'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
+                                'custom_position': str(field['custom_position']), 'effective_type': field['effective_type'],
+                                'base_type': field['base_type'], 'database_type': field['database_type']
+                              })
+        return result
 
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
-metabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
-metabase.delete_database('base')
-print(json.dumps(metabase.get_field('base', 'table', 'field')))
+#metabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
+#metabase.delete_database('base')
+#print(json.dumps(metabase.get_field('base', 'table', 'field')))
 
-
+export = metabase.export_fields('igpvaucluse')
+with open('metabase_api.csv', 'w', newline = '') as csvfile:
+    my_writer = csv.writer(csvfile, delimiter = ';')
+    need_header = True
+    for row in export:
+        if need_header:
+            my_writer.writerow(row.keys())
+            need_header = False
+        my_writer.writerow(row.values())
