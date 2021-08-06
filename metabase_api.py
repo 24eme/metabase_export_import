@@ -247,7 +247,35 @@ class Metabase:
         if fk :
             data['fk_target_field_id'] = fk['id']
         return self.query('PUT', 'field/'+data['id'], data)
+
+    def database_name2id(self, database_name):
+        if self.database_export is None:
+            self.database_export = self.get_database(database_name, True)
+        return self.database_export['id']
             
+    def get_cards(self, database_name):
+        database_id = self.database_name2id(database_name)
+        return self.query('GET', 'card?f=database&model_id='+str(database_id))
+
+    def get_collections(self, database_name):
+        database_id = self.database_name2id(database_name)
+        return self.query('GET', 'collection')
+
+    def get_dashboards(self, database_name):
+        database_id = self.database_name2id(database_name)
+        dashbords_light = self.query('GET', 'dashboard')
+        dashboards = []
+        for d in dashbords_light:
+            res = self.query('GET', 'dashboard/'+str(d['id']))
+            good_db = True
+            for c in res['ordered_cards']:
+                if c['card']['database_id'] != database_id:
+                    good_db = False
+                    continue
+            if not good_db:
+                continue
+            dashboards.append(self.query('GET', 'dashboard/'+str(d['id'])))
+        return dashboards
 
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
