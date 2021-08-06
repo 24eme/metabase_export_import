@@ -194,12 +194,16 @@ class Metabase:
             for field in table['fields']:
                 field_id = field['fk_target_field_id']
                 [fk_table, fk_field] = self.field_id2tablenameandfieldname(database_name, field_id)
+                if not field['semantic_type']:
+                    field['semantic_type'] = ''
+                if not field['custom_position']:
+                    field['custom_position'] = ''
                 result.append({
                                 'table_name': table_name, 'field_name': field['name'], 'description': field['description'],
-                                'semantic_type': str(field['semantic_type']),
+                                'semantic_type': field['semantic_type'],
                                 'foreign_table': fk_table, 'foreign_field': fk_field,
                                 'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
-                                'custom_position': str(field['custom_position']), 'effective_type': field['effective_type'],
+                                'custom_position': field['custom_position'], 'effective_type': field['effective_type'],
                                 'base_type': field['base_type'], 'database_type': field['database_type']
                               })
         return result
