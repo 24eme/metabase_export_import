@@ -173,7 +173,7 @@ class Metabase:
                     return [table['name'], field['name']]
         return ['', '']
 
-    def table_id2tablename(self, database_name, table_id):
+    def table_id2name(self, database_name, table_id):
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
         if not table_id:
@@ -293,80 +293,65 @@ class Metabase:
                     continue
             if not good_db:
                 continue
-            dashboards.append(self.dashboard_convert_id2name(database_name,res))
+            dashboards.append(self.convert_id2name(database_name, res, None))
         return dashboards
 
-    def dashboard_convert_id2name(self, database_name, dashboard):
-        if dashboard.get('param_values') is not None:
-            param_values = dashboard.pop('param_values')
-            dashboard['param_values'] = {}
-            for k in param_values.keys():
-                param = param_values[k]
-                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k))
-                param.pop('field_id')
-                param['field_name'] = '%'+t+'|'+f+'%'
-                dashboard['param_values']['%'+t+'|'+f+'%'] = param
-        if dashboard.get('param_fields') is not None:
-            param_fields = dashboard.pop('param_fields')
-            dashboard['param_fields'] = {}
-            for k in param_fields.keys():
-                param = param_fields[k]
-                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k))
-                param.pop('id')
-                param['field_name'] = '%'+t+'|'+f+'%'
-                tid = param.pop('table_id')
-                param['table_name'] = '%'+self.table_id2tablename(database_name, tid)+'%'
-                dashboard['param_fields']['%'+t+'|'+f+'%'] = param
-        if dashboard.get('ordered_cards'):
-            for ocardid in range(len(dashboard.get('ordered_cards'))):
-                if dashboard['ordered_cards'][ocardid].get('card'):
-                    tableid = dashboard['ordered_cards'][ocardid]['card'].pop('table_id')
-                    if tableid:
-                        dashboard['ordered_cards'][ocardid]['card']['table_name'] = '%'+self.table_id2tablename(database_name, int(tableid))+'%'
-                    for resid in range(len(dashboard['ordered_cards'][ocardid]['card']['result_metadata'])):
-                        if dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid].get('id'):
-                            field = dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid].pop('id')
-                            [t, f] = self.field_id2tablenameandfieldname(database_name, int(field))
-                            dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid]['field_name'] = '%'+t+'|'+f+'%'
-                            if dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid]['field_ref'][0] == 'field':
-                                field = dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid]['field_ref'][1]
-                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(field))
-                                dashboard['ordered_cards'][ocardid]['card']['result_metadata'][resid]['field_ref'][1] = '%'+t+'|'+f+'%'
-                    if dashboard['ordered_cards'][ocardid]['card']['dataset_query'].get('query'):
-                        tableid = dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'].pop('source-table')
-                        dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query']['source-table_name'] = '%'+self.table_id2tablename(database_name, int(tableid))+'%'
-                        for key in ['aggregation', 'breakout', 'order-by', 'filter']:
-                            if dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'].get(key):
-                                for index in range(len(dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'][key])):
-                                    if isinstance(dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'][key][index], list) and dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'][key][index][0] == "field":
-                                        [t, f] = self.field_id2tablenameandfieldname(database_name, int(dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'][key][index][1]))
-                                        dashboard['ordered_cards'][ocardid]['card']['dataset_query']['query'][key][index][1] = '%'+t+'|'+f+'%'
-                    if dashboard['ordered_cards'][ocardid]['card']['visualization_settings'].get('pivot_table.column_split'):
-                        for pivot in ['rows', 'columns', 'values']:
-                            if dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['pivot_table.column_split'].get(pivot):
-                                for i in range(len(dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['pivot_table.column_split'][pivot])):
-                                    if dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['pivot_table.column_split'][pivot][i][0] == 'field':
-                                        [t, f] = self.field_id2tablenameandfieldname(database_name, int(dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['pivot_table.column_split'][pivot][i][1]))
-                                        dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['pivot_table.column_split'][pivot][i][1] = '%'+t+'|'+f+'%'
-                    if dashboard['ordered_cards'][ocardid]['card']['visualization_settings'].get('table.columns'):
-                        for i in range(len(dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['table.columns'])):
-                                if dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['table.columns'][i].get('fieldRef') and dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['table.columns'][i]['fieldRef'][0] == 'field':
-                                    [t, f] = self.field_id2tablenameandfieldname(database_name, int(dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['table.columns'][i]['fieldRef'][1]))
-                                    dashboard['ordered_cards'][ocardid]['card']['visualization_settings']['table.columns'][i]['fieldRef'][1] = '%'+t+'|'+f+'%'
-                if dashboard['ordered_cards'][ocardid]['visualization_settings'].get('pivot_table.column_split'):
-                    for pivot in ['rows', 'columns', 'values']:
-                        if dashboard['ordered_cards'][ocardid]['visualization_settings']['pivot_table.column_split'].get(pivot):
-                            for i in range(len(dashboard['ordered_cards'][ocardid]['visualization_settings']['pivot_table.column_split'][pivot])):
-                                if dashboard['ordered_cards'][ocardid]['visualization_settings']['pivot_table.column_split'][pivot][i][0] == 'field':
-                                    [t, f] = self.field_id2tablenameandfieldname(database_name, int(dashboard['ordered_cards'][ocardid]['visualization_settings']['pivot_table.column_split'][pivot][i][1]))
-                                    dashboard['ordered_cards'][ocardid]['visualization_settings']['pivot_table.column_split'][pivot][i][1] = '%'+t+'|'+f+'%'
-                if dashboard['ordered_cards'][ocardid]['visualization_settings'].get('table.columns'):
-                    for i in range(len(dashboard['ordered_cards'][ocardid]['visualization_settings']['table.columns'])):
-                            if dashboard['ordered_cards'][ocardid]['visualization_settings']['table.columns'][i]['fieldRef'][0] == 'field':
-                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(dashboard['ordered_cards'][ocardid]['visualization_settings']['table.columns'][i]['fieldRef'][1]))
-                                dashboard['ordered_cards'][ocardid]['visualization_settings']['table.columns'][i]['fieldRef'][1] = '%'+t+'|'+f+'%'
-                #TODO: column_settings
-        return dashboard
+    def convert_id2name(self, database_name, obj, previous_key):
+        obj_res = obj
+        if isinstance(obj, list):
+            if len(obj) and obj[0] == 'field':
+                try:
+                    [t, f] = self.field_id2tablenameandfieldname(database_name, int(obj_res[1]))
+                    obj_res[1] = '%'+t+'|'+f
+                except ValueError:
+                    obj_res[1] = obj[1]
+            else:
+                for i in range(len(obj)):
+                    obj_res[i] = self.convert_id2name(database_name, obj[i], previous_key)
+        elif isinstance(obj, dict):
+            obj_res = obj.copy()
+            for k in obj.keys():
+                if isinstance(obj[k], dict) or isinstance(obj[k], list):
+                    k_previous = previous_key
+                    k2int = None
+                    try:
+                        k2int = int(k)
+                        k_name = k
+                        if k2int:
+                            [t, f] = self.field_id2tablenameandfieldname(database_name, k2int)
+                            k_name = '%'+t+'|'+f
+                    except ValueError:
+                        k_name = k
+                        k_previous = k
+                    if not k2int:
+                        try:
+                            k_data = json.loads(k)
+                            if k_data[0] == 'ref':
+                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
+                                k_data[1][1] = '%'+t+'|'+f
+                            k_name = json.dumps(k_data)
+                        except json.decoder.JSONDecodeError:
+                            k_name = k
+                            k_previous = k
+                    obj_res.pop(k)
+                    obj_res[k_name] = self.convert_id2name(database_name, obj[k], k_previous)
+                else:
+                    if k in ['field_id'] or (k == 'id' and previous_key in ['result_metadata', 'param_fields']):
+                        id = obj_res.pop(k)
+                        if id:
+                            [t, f] = self.field_id2tablenameandfieldname(database_name, int(id))
+                            obj_res['field_name'] = k+'%'+t+'|'+f
+                    elif k in ['table_id', 'source-table']:
+                        id = obj_res.pop(k)
+                        if id:
+                            t = self.table_id2name(database_name, int(id))
+                            obj_res['table_name'] = k+'%'+t
+                    elif k in ['card_id']:
+                        id = obj_res.pop(k)
+                        if id:
+                            n = self.card_id2name(database_name, int(id))
+                            obj_res['card_name'] = k+'%'+n
+        return obj_res
 
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
