@@ -353,6 +353,12 @@ class Metabase:
                             obj_res['card_name'] = k+'%'+n
         return obj_res
 
+    def export_dashboards_to_json(self, database_name, filename):
+        export = metabase.get_dashboards(database_name)
+        with open(filename, 'w', newline = '') as jsonfile:
+            jsonfile.write(json.dumps(export))
+
+
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
 #metabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
@@ -362,3 +368,6 @@ metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 
 metabase.import_fields_from_csv(metabase_base, 'metabase_api_tobeimported.csv')
 metabase.export_fields_to_csv(metabase_base, 'metabase_api_exported.csv')
+
+metabase.export_dashboards_to_json(metabase_base, 'metabase_api_exported.json')
+
