@@ -204,7 +204,7 @@ class Metabase:
                                 'foreign_table': fk_table, 'foreign_field': fk_field,
                                 'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
                                 'custom_position': field['custom_position'], 'effective_type': field['effective_type'],
-                                'base_type': field['base_type'], 'database_type': field['database_type']
+                                'base_type': field['base_type'], 'database_type': field['database_type'], 'field_id': field['id']
                               })
         return result
         
