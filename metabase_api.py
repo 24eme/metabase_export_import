@@ -18,6 +18,7 @@ class Metabase:
         
         self.metabase_session = None
         self.database_export = None
+        self.cards_export = None
         
     def query (self, method, query_name, json_data = None):
         json_str = None
@@ -180,6 +181,14 @@ class Metabase:
         for table in self.database_export['tables']:
             if table['id'] == table_id:
                 return table['name']
+        return ''
+
+    def card_id2name(self, database_name, card_id):
+        if self.cards_export is None:
+            self.cards_export = self.get_cards(database_name)
+        for card in self.cards_export:
+            if card['id'] == card_id:
+                return card['name']
         return ''
 
     def field_tablenameandfieldname2field(self, database_name, table_name, field_name):
