@@ -19,6 +19,7 @@ class Metabase:
         self.metabase_session = None
         self.database_export = None
         self.cards_export = None
+        self.dashboards_name2id = dict()
         
     def query (self, method, query_name, json_data = None):
         json_str = None
@@ -317,6 +318,50 @@ class Metabase:
                 continue
             dashboards.append(self.convert_ids2names(database_name, res, None))
         return dashboards
+
+    def dashboard_name2id(self, database_name, dashboard_name):
+        if not self.dashboards_name2id:
+            for d in self.get_dashboards(database_name):
+                self.dashboards_name2id[d['name']] = d['id']
+        return self.dashboards_name2id.get(dashboard_name)
+
+    def convert_pcnames2id(self, database_name, fieldname, pcnames):
+        if pcname[0] != '%':
+            return [None, None]
+        [empty, new_k, names] = pcname.split('%')
+        if new_k == 'JSONCONV':
+            return 'TODO'
+        if fieldname == 'database_name':
+            return [new_k, self.database_name2id(database_name)]
+        [t_name, f_name] = names.split('|')
+        field = self.field_tablenameandfieldname2field(database_name, t_name, f_name)
+        if field:
+            return[new_k, field['id']]
+        table_id = self.table_name2id(database_name, t_name)
+        return [new_k, table_id]
+
+    def convert_names2ids(self, database_name, obj):
+        obj_res = obj
+        if isinstance(obj, list):
+            if len(obj) and obj[0] == 'field':
+                if obj[1][0] == '%':
+                    [k_name, value] = self.convert_pcnames2id(database_name, None, obj[1])
+                    obj_res[1] = value
+            else:
+                for i in range(len(obj)):
+                    obj_res[i] = self.convert_names2ids(database_name, obj[i])
+        elif isinstance(obj, dict):
+            obj_res = obj.copy()
+            for k in obj.keys():
+                if k[0] == '%':
+                    [new_k, value] = self.convert_pcnames2id(database_name, None, k)
+                    obj_res.pop(k)
+                    obj_res[new_k] = obj[k]
+                elif k in ['field_name', 'table_name', 'database_name'] and obj[k][0] == '%':
+                    [new_k, value] = self.convert_pcnames2id(database_name, k, obj[k])
+                    obj_res.pop(k)
+                    obj_res[new_k] = value
+        return obj_res
 
     def convert_ids2names(self, database_name, obj, previous_key):
         obj_res = obj
