@@ -103,7 +103,9 @@ class Metabase:
         if (full_info):
             url += '?include=tables'
         databases = self.query('GET', url)
-        return databases
+        if isinstance(databases, list):
+            return databases
+        return databases['data']
         
     def create_database(self, name, engine, details, is_full_sync=True, is_on_demand=False, auto_run_queries=True):
         self.create_session_if_needed()
