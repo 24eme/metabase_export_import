@@ -198,18 +198,32 @@ class Metabase:
             self.database_export = self.get_database(database_name, True)
         if not table_name or not field_name:
             return None
+        if not self.database_export.get('tables'):
+            return None
         for table in self.database_export['tables']:
             if table['name'] == table_name:
                 for field in table['fields']:
                     if field['name'] == field_name:
                         return field
         return None
+    
+    def table_name2id(self, database_name, table_name):
+        if self.database_export is None:
+            self.database_export = self.get_database(database_name, True)
+        if not table_name or not field_name:
+            return None
+        if not self.database_export.get('tables'):
+            return None
+        for table in self.database_export['tables']:
+            if table['name'] == table_name:
+                return table['id']
+        return None
                     
-                    
-
     def export_fields(self, database_name):
         self.database_export = self.get_database(database_name, True)
         result = []
+        if not self.database_export.get('tables'):
+            return None
         for table in self.database_export['tables']:
             table_name = table['name']
             for field in table['fields']:
@@ -231,6 +245,8 @@ class Metabase:
         
     def export_fields_to_csv(self, database_name, filename):
         export = metabase.export_fields(database_name)
+        if not export:
+            return
         with open(filename, 'w', newline = '') as csvfile:
             my_writer = csv.writer(csvfile, delimiter = ',')
             need_header = True
@@ -256,6 +272,8 @@ class Metabase:
 
     def update_field(self, database_name, field):
         field_from_api = self.field_tablenameandfieldname2field(database_name, field['table_name'], field['field_name'])
+        if not field_from_api:
+            return None
         fk = self.field_tablenameandfieldname2field(database_name, field['foreign_table'], field['foreign_field'])
         field.pop('foreign_table')
         field.pop('foreign_field')
@@ -272,6 +290,8 @@ class Metabase:
     def database_name2id(self, database_name):
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
+        if not self.database_export.get('id'):
+            return None
         return self.database_export['id']
             
     def get_cards(self, database_name):
