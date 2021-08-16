@@ -315,21 +315,21 @@ class Metabase:
                     continue
             if not good_db:
                 continue
-            dashboards.append(self.convert_id2name(database_name, res, None))
+            dashboards.append(self.convert_ids2names(database_name, res, None))
         return dashboards
 
-    def convert_id2name(self, database_name, obj, previous_key):
+    def convert_ids2names(self, database_name, obj, previous_key):
         obj_res = obj
         if isinstance(obj, list):
             if len(obj) and obj[0] == 'field':
                 try:
                     [t, f] = self.field_id2tablenameandfieldname(database_name, int(obj_res[1]))
-                    obj_res[1] = '%'+t+'|'+f
+                    obj_res[1] = '%%'+t+'|'+f
                 except ValueError:
                     obj_res[1] = obj[1]
             else:
                 for i in range(len(obj)):
-                    obj_res[i] = self.convert_id2name(database_name, obj[i], previous_key)
+                    obj_res[i] = self.convert_ids2names(database_name, obj[i], previous_key)
         elif isinstance(obj, dict):
             obj_res = obj.copy()
             for k in obj.keys():
@@ -341,7 +341,7 @@ class Metabase:
                         k_name = k
                         if k2int:
                             [t, f] = self.field_id2tablenameandfieldname(database_name, k2int)
-                            k_name = '%'+t+'|'+f
+                            k_name = '%%'+t+'|'+f
                     except ValueError:
                         k_name = k
                         k_previous = k
@@ -350,29 +350,31 @@ class Metabase:
                             k_data = json.loads(k)
                             if k_data[0] == 'ref':
                                 [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
-                                k_data[1][1] = '%'+t+'|'+f
-                            k_name = json.dumps(k_data)
+                                k_data[1][1] = '%%'+t+'|'+f
+                                k_name = '%JSONCONV%'+json.dumps(k_data)
+                            else:
+                                k_name = k
                         except json.decoder.JSONDecodeError:
                             k_name = k
                             k_previous = k
                     obj_res.pop(k)
-                    obj_res[k_name] = self.convert_id2name(database_name, obj[k], k_previous)
+                    obj_res[k_name] = self.convert_ids2names(database_name, obj[k], k_previous)
                 else:
                     if k in ['field_id'] or (k == 'id' and previous_key in ['result_metadata', 'param_fields']):
                         id = obj_res.pop(k)
                         if id:
                             [t, f] = self.field_id2tablenameandfieldname(database_name, int(id))
-                            obj_res['field_name'] = k+'%'+t+'|'+f
+                            obj_res['field_name'] = '%'+k+'%'+t+'|'+f
                     elif k in ['table_id', 'source-table']:
                         id = obj_res.pop(k)
                         if id:
                             t = self.table_id2name(database_name, int(id))
-                            obj_res['table_name'] = k+'%'+t
+                            obj_res['table_name'] = '%'+k+'%'+t
                     elif k in ['card_id']:
                         id = obj_res.pop(k)
                         if id:
                             n = self.card_id2name(database_name, int(id))
-                            obj_res['card_name'] = k+'%'+n
+                            obj_res['card_name'] = '%'+k+'%'+n
         return obj_res
 
     def export_dashboards_to_json(self, database_name, filename):
