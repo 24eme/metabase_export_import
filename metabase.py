@@ -318,6 +318,15 @@ class MetabaseApi:
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
 
+    def dashboard_id2name(self, database_name, dashboard_id):
+        if not self.dashboards_name2id:
+            for d in self.get_dashboards(database_name):
+                self.dashboards_name2id[d['name']] = d['id']
+        for dname in self.dashboards_name2id.keys():
+            if self.dashboards_name2id[dname] == dashboard_id:
+                return dname
+        return None
+
     def card_name2id(self, database_name, card_name):
         if not self.cards_name2id:
             for c in self.get_cards(database_name):
@@ -473,9 +482,12 @@ class MetabaseApi:
 
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
         dashid = self.dashboard_name2id(database_name, dashboard_name)
-        cardid = self.card_name2id(database_name, card_from_json['name'])
+        print(ordered_card_from_json)
+        cardid = ordered_card_from_json['card_id']
         if cardid:
-            return self.query('PUT', 'dashboard/'+str(dashid)+'/cards', dash_from_json)
+            ordered_card_from_json['cardId'] = cardid
+            ordered_card_from_json.pop('card')
+            return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
 
     def import_cards_from_json(self, database_name, filename):
         res = []
@@ -501,6 +513,6 @@ class MetabaseApi:
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
                 for ocard in dash['ordered_cards']:
-                    res[1].append(self.card_import(database_name, ocard['card']))
+                    res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
         return res
 
