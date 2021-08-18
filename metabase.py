@@ -318,9 +318,8 @@ class MetabaseApi:
 
     def card_name2id(self, database_name, card_name):
         if not self.cards_name2id:
-            for d in self.get_dashboards(database_name):
-                for oc in d['ordered_cards']:
-                    self.cards_name2id[oc['card']['name']] = oc['card']['id']
+            for c in self.get_cards(database_name):
+                self.cards_name2id[c['name']] = c['id']
         return self.cards_name2id.get(card_name)
 
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
