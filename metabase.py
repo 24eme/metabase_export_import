@@ -57,7 +57,7 @@ class MetabaseApi:
                                 headers= headers
                                 )
         else:
-            return {'errors': ['unkown method: '+method+' (GET,POST,DELETE allowed)']}
+            raise ConnectionError('unkown method: '+method+' (GET,POST,DELETE allowed)')
         
         if self.debug:
             print(r.text)
@@ -65,12 +65,14 @@ class MetabaseApi:
         try:
             query_response = r.json()
             if query_response.get('errors'):
-                return query_response
+                raise ConnectionError(query_response)
+            if query_response.get('_status') == 500:
+                raise ConnectionError(query_response)
         except AttributeError:
             return query_response
         except ValueError:
             if (r.text):
-                return {'errors': [r.text]}
+                raise ConnectionError(r.text)
             return {}
         
         return query_response
@@ -283,7 +285,7 @@ class MetabaseApi:
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
         if not self.database_export.get('id'):
-            return None
+            raise ConnectionError('Unknown database name '+database_name)
         return self.database_export['id']
 
     def get_cards(self, database_name):
@@ -341,10 +343,11 @@ class MetabaseApi:
             field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
             if field:
                 return[new_k, field['id']]
+            raise ValueError('field not found: '+resplit[0]+'/'+resplit[1])
         if len(resplit) == 1:
             table_id = self.table_name2id(database_name, resplit[0])
             return [new_k, table_id]
-        return [None, None]
+        raise ValueError('Unknown '+str(fieldname)+' %'+str(new_k)+'% type')
 
     def convert_names2ids(self, database_name, obj):
         obj_res = obj
@@ -469,7 +472,6 @@ class MetabaseApi:
         return self.query('POST', 'card', card_from_json)
 
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
-        raise ValueError('blam')
         dashid = self.dashboard_name2id(database_name, dashboard_name)
         cardid = self.card_name2id(database_name, card_from_json['name'])
         if cardid:
@@ -478,9 +480,18 @@ class MetabaseApi:
     def import_cards_from_json(self, database_name, filename):
         res = []
         with open(filename, 'r', newline = '') as jsonfile:
-            jsondata = self.convert_names2ids(database_name, json.load(jsonfile))
+            jsondata = json.load(jsonfile)
+            errors = None
             for card in jsondata:
-                res.append(self.card_import(database_name, card))
+                try:
+                    res.append(self.card_import(database_name, self.convert_names2ids(database_name, card)))
+                except ValueError as e:
+                    if not errors:
+                        errors = e
+                    else:
+                        errors = ValueError(str(errors) + " / " + str(e))
+            if errors:
+                raise errors
         return res
 
     def import_dashboards_from_json(self, database_name, filename):
