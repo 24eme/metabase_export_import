@@ -326,19 +326,25 @@ class Metabase:
         return self.dashboards_name2id.get(dashboard_name)
 
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
-        if pcname[0] != '%':
+        if pcnames[0] != '%':
             return [None, None]
-        [empty, new_k, names] = pcname.split('%')
+        pcres = pcnames.split('%')
+        if len(pcres) != 3:
+            return [None, None]
+        [empty, new_k, names] = pcres
         if new_k == 'JSONCONV':
             return 'TODO'
         if fieldname == 'database_name':
             return [new_k, self.database_name2id(database_name)]
-        [t_name, f_name] = names.split('|')
-        field = self.field_tablenameandfieldname2field(database_name, t_name, f_name)
-        if field:
-            return[new_k, field['id']]
-        table_id = self.table_name2id(database_name, t_name)
-        return [new_k, table_id]
+        resplit = names.split('|')
+        if len(resplit) == 2:
+            field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
+            if field:
+                return[new_k, field['id']]
+        if len(resplit) == 1:
+            table_id = self.table_name2id(database_name, resplit[0])
+            return [new_k, table_id]
+        return [None, None]
 
     def convert_names2ids(self, database_name, obj):
         obj_res = obj
