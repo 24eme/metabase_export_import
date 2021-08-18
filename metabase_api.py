@@ -457,6 +457,44 @@ class Metabase:
         with open(filename, 'w', newline = '') as jsonfile:
             jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
 
+    def export_cards_to_json(self, database_name, filename):
+        export = metabase.get_cards(database_name)
+        with open(filename, 'w', newline = '') as jsonfile:
+            jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
+
+    def dashboard_import(self, database_name, dash_from_json):
+        dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
+        if dashid:
+            return self.query('PUT', 'dashboard/'+str(dashid), dash_from_json)
+        self.dashboards_name2id = {}
+        return self.query('POST', 'dashboard', dash_from_json)
+
+    def card_import(self, database_name, card_from_json):
+        if not card_from_json.get('description'):
+            card_from_json['description'] = None
+        cardid = self.card_name2id(database_name, card_from_json['name'])
+        if cardid:
+            return self.query('PUT', 'card/'+str(cardid), card_from_json)
+        self.cards_name2id = {}
+        return self.query('POST', 'card', card_from_json)
+
+    def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
+        raise ValueError('blam')
+        dashid = self.dashboard_name2id(database_name, dashboard_name)
+        cardid = self.card_name2id(database_name, card_from_json['name'])
+        if cardid:
+            return self.query('PUT', 'dashboard/'+str(dashid)+'/cards', dash_from_json)
+
+    def import_dashboards_from_json(self, database_name, filename):
+        res = [[], [], []]
+        with open(filename, 'r', newline = '') as jsonfile:
+            jsondata = self.convert_names2ids(database_name, json.load(jsonfile))
+            for dash in jsondata:
+                res[0].append(self.dashboard_import(database_name, dash))
+                for ocard in dash['ordered_cards']:
+                    res[1].append(self.card_import(database_name, ocard['card']))
+        return res
+
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
 #metabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
