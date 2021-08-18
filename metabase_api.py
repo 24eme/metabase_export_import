@@ -447,6 +447,9 @@ class Metabase:
                         if id:
                             n = self.card_id2name(database_name, int(id))
                             obj_res['card_name'] = '%'+k+'%'+n
+                    elif k in ['database_id', 'database']:
+                        obj_res.pop(k)
+                        obj_res['database_name'] = '%'+k+'%'
         return obj_res
 
     def export_dashboards_to_json(self, database_name, filename):
