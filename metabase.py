@@ -325,12 +325,13 @@ class MetabaseApi:
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
         if pcnames[0] != '%':
             return [None, None]
+        if pcnames[1:9] == 'JSONCONV':
+            data = self.convert_names2ids(database_name, json.loads(pcnames[10:]))
+            return [json.dumps(data), None]
         pcres = pcnames.split('%')
         if len(pcres) != 3:
             return [None, None]
         [empty, new_k, names] = pcres
-        if new_k == 'JSONCONV':
-            raise ValueError('JSONCONV')
         if fieldname == 'database_name':
             return [new_k, self.database_name2id(database_name)]
         if fieldname == 'card_name':
