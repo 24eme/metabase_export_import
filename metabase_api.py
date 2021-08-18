@@ -316,7 +316,7 @@ class Metabase:
                     continue
             if not good_db:
                 continue
-            dashboards.append(self.convert_ids2names(database_name, res, None))
+            dashboards.append(res)
         return dashboards
 
     def dashboard_name2id(self, database_name, dashboard_name):
@@ -425,8 +425,7 @@ class Metabase:
     def export_dashboards_to_json(self, database_name, filename):
         export = metabase.get_dashboards(database_name)
         with open(filename, 'w', newline = '') as jsonfile:
-            jsonfile.write(json.dumps(export))
-
+            jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
 
 metabase = Metabase(metabase_apiurl, metabase_username, metabase_password)
 #metabase.debug = True
