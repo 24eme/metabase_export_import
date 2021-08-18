@@ -81,11 +81,8 @@ class MetabaseApi:
             self.metabase_session = json_response["id"]
         except KeyError:
             if json_response.get('errors'):
-                print("ERROR: ",  end='')
-                print(json_response['errors'])
-            else:
-                print("ERROR: enable to connect" + r.text)
-            sys.exit(10)
+                raise ConnectionError(json_response['errors'])
+            raise ConnectionError("ERROR: enable to connect: " + str(json_response))
 
     def create_session_if_needed(self):
         if self.metabase_session:
