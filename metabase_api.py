@@ -211,7 +211,7 @@ class Metabase:
     def table_name2id(self, database_name, table_name):
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
-        if not table_name or not field_name:
+        if not table_name:
             return None
         if not self.database_export.get('tables'):
             return None
