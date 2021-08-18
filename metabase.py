@@ -475,6 +475,14 @@ class MetabaseApi:
         if cardid:
             return self.query('PUT', 'dashboard/'+str(dashid)+'/cards', dash_from_json)
 
+    def import_cards_from_json(self, database_name, filename):
+        res = []
+        with open(filename, 'r', newline = '') as jsonfile:
+            jsondata = self.convert_names2ids(database_name, json.load(jsonfile))
+            for card in jsondata:
+                res.append(self.card_import(database_name, card))
+        return res
+
     def import_dashboards_from_json(self, database_name, filename):
         res = [[], [], []]
         with open(filename, 'r', newline = '') as jsonfile:
