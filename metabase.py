@@ -332,9 +332,7 @@ class MetabaseApi:
     def card_name2id(self, database_name, card_name):
         if not self.cards_name2id:
             for c in self.get_cards(database_name):
-                print(['card_name2id', c['name'], c['id']])
                 self.cards_name2id[c['name']] = c['id']
-        print(['card_name2id', card_name, self.cards_name2id.get(card_name)])
         return self.cards_name2id.get(card_name)
 
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
@@ -498,7 +496,6 @@ class MetabaseApi:
 
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
         dashid = self.dashboard_name2id(database_name, dashboard_name)
-        print(ordered_card_from_json)
         cardid = ordered_card_from_json['card_id']
         if cardid:
             ordered_card_from_json['cardId'] = cardid
