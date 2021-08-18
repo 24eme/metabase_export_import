@@ -362,11 +362,14 @@ class Metabase:
                 if k[0] == '%':
                     [new_k, value] = self.convert_pcnames2id(database_name, None, k)
                     obj_res.pop(k)
-                    obj_res[new_k] = obj[k]
+                    obj_res[new_k] = self.convert_names2ids(database_name, obj[k])
                 elif k in ['field_name', 'table_name', 'database_name'] and obj[k][0] == '%':
                     [new_k, value] = self.convert_pcnames2id(database_name, k, obj[k])
                     obj_res.pop(k)
                     obj_res[new_k] = value
+                else:
+                    if isinstance(obj[k], dict) or isinstance(obj[k], list):
+                        obj_res[k] = self.convert_names2ids(database_name, obj[k])
         return obj_res
 
     def convert_ids2names(self, database_name, obj, previous_key):
@@ -387,6 +390,7 @@ class Metabase:
                 if isinstance(obj[k], dict) or isinstance(obj[k], list):
                     k_previous = previous_key
                     k2int = None
+                    #Cas de clé d'un dictionnaire qui sont les id de fields
                     try:
                         k2int = int(k)
                         k_name = k
@@ -396,6 +400,7 @@ class Metabase:
                     except ValueError:
                         k_name = k
                         k_previous = k
+                    #Cas de clé du dictionnaire qui sont du json encodé
                     if not k2int:
                         try:
                             k_data = json.loads(k)
