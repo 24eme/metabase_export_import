@@ -298,6 +298,10 @@ class MetabaseApi:
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'collection')
 
+    def get_dashboard(self, database_name, dashboard_name):
+        dashboard_id = self.dashboard_name2id(dashboard_name, dashboard_name)
+        return self.query('GET', 'dashboard/'+str(dashboard_id))
+
     def get_dashboards(self, database_name):
         database_id = self.database_name2id(database_name)
         dashbords_light = self.query('GET', 'dashboard')
@@ -494,6 +498,13 @@ class MetabaseApi:
         self.cards_name2id = {}
         return self.query('POST', 'card', card_from_json)
 
+    def dashboard_delete_all_cards(self, database_name, dashboard_name):
+        dash = self.get_dashboard(database_name, dashboard_name)
+        res = []
+        for c in dash['ordered_cards']:
+            res.append(self.query('DELETE', 'dashboard/'+str(dash['id'])+'/cards?dashcardId='+str(c['id'])))
+        return res
+
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
         dashid = self.dashboard_name2id(database_name, dashboard_name)
         cardid = ordered_card_from_json['card_id']
@@ -525,7 +536,7 @@ class MetabaseApi:
             jsondata = self.convert_names2ids(database_name, json.load(jsonfile))
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
+                self.dashboard_delete_all_cards(database_name, dash['name'])
                 for ocard in dash['ordered_cards']:
                     res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
         return res
-
