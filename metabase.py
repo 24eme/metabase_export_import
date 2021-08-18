@@ -330,19 +330,21 @@ class MetabaseApi:
     def card_name2id(self, database_name, card_name):
         if not self.cards_name2id:
             for c in self.get_cards(database_name):
+                print(['card_name2id', c['name'], c['id']])
                 self.cards_name2id[c['name']] = c['id']
+        print(['card_name2id', card_name, self.cards_name2id.get(card_name)])
         return self.cards_name2id.get(card_name)
 
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
         if pcnames[0] != '%':
-            return [None, None]
-        if pcnames[1:9] == 'JSONCONV':
-            data = self.convert_names2ids(database_name, json.loads(pcnames[10:]))
+            raise ValueError('Not a convertible value')
+        sep = pcnames.find('%', 1)
+        if sep == -1:
+            raise ValueError('Not a convertible value')
+        [new_k, names] = pcnames[1:sep], pcnames[sep+1:]
+        if new_k == 'JSONCONV':
+            data = self.convert_names2ids(database_name, json.loads(names))
             return [json.dumps(data), None]
-        pcres = pcnames.split('%')
-        if len(pcres) != 3:
-            return [None, None]
-        [empty, new_k, names] = pcres
         if fieldname == 'database_name':
             return [new_k, self.database_name2id(database_name)]
         if fieldname == 'card_name':
