@@ -19,7 +19,8 @@ class Metabase:
         self.metabase_session = None
         self.database_export = None
         self.cards_export = None
-        self.dashboards_name2id = dict()
+        self.dashboards_name2id = {}
+        self.cards_name2id = {}
         
     def query (self, method, query_name, json_data = None):
         json_str = None
@@ -325,6 +326,13 @@ class Metabase:
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
 
+    def card_name2id(self, database_name, card_name):
+        if not self.cards_name2id:
+            for d in self.get_dashboards(database_name):
+                for oc in d['ordered_cards']:
+                    self.cards_name2id[oc['card']['name']] = oc['card']['id']
+        return self.cards_name2id.get(card_name)
+
     def convert_pcnames2id(self, database_name, fieldname, pcnames):
         if pcnames[0] != '%':
             return [None, None]
@@ -336,6 +344,8 @@ class Metabase:
             return 'TODO'
         if fieldname == 'database_name':
             return [new_k, self.database_name2id(database_name)]
+        if fieldname == 'card_name':
+            return [new_k, self.card_name2id(database_name, names)]
         resplit = names.split('|')
         if len(resplit) == 2:
             field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
@@ -363,7 +373,7 @@ class Metabase:
                     [new_k, value] = self.convert_pcnames2id(database_name, None, k)
                     obj_res.pop(k)
                     obj_res[new_k] = self.convert_names2ids(database_name, obj[k])
-                elif k in ['field_name', 'table_name', 'database_name'] and obj[k][0] == '%':
+                elif k in ['field_name', 'table_name', 'database_name', 'card_name'] and obj[k][0] == '%':
                     [new_k, value] = self.convert_pcnames2id(database_name, k, obj[k])
                     obj_res.pop(k)
                     obj_res[new_k] = value
@@ -424,8 +434,14 @@ class Metabase:
                     elif k in ['table_id', 'source-table']:
                         id = obj_res.pop(k)
                         if id:
-                            t = self.table_id2name(database_name, int(id))
-                            obj_res['table_name'] = '%'+k+'%'+t
+                            try:
+                                t = self.table_id2name(database_name, int(id))
+                                obj_res['table_name'] = '%'+k+'%'+t
+                            except ValueError:
+                                res = id.split('_')
+                                if res[0] == 'card':
+                                    c = self.card_id2name(database_name, int(res[2]))
+                                    obj_res['pseudo_table_name_card'] = '%'+k+'%'+c
                     elif k in ['card_id']:
                         id = obj_res.pop(k)
                         if id:
