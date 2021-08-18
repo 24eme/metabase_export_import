@@ -349,6 +349,13 @@ class MetabaseApi:
             return [new_k, self.database_name2id(database_name)]
         if fieldname == 'card_name':
             return [new_k, self.card_name2id(database_name, names)]
+        if fieldname == 'dashboard_name':
+            return [new_k, self.dashboard_name2id(database_name, names)]
+        if fieldname == 'pseudo_table_card_name':
+            card_id = self.card_name2id(database_name, names)
+            if not card_id:
+                raise ValueError('card_name '+names+' not found')
+            return [new_k, 'card__'+str(card_id)]
         resplit = names.split('|')
         if len(resplit) == 2:
             field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
@@ -374,10 +381,13 @@ class MetabaseApi:
             obj_res = obj.copy()
             for k in obj.keys():
                 if k[0] == '%':
-                    [new_k, value] = self.convert_pcnames2id(database_name, None, k)
-                    obj_res.pop(k)
-                    obj_res[new_k] = self.convert_names2ids(database_name, obj[k])
-                elif k in ['field_name', 'table_name', 'database_name', 'card_name'] and obj[k][0] == '%':
+                    try:
+                        [new_k, value] = self.convert_pcnames2id(database_name, None, k)
+                        obj_res.pop(k)
+                        obj_res[new_k] = self.convert_names2ids(database_name, obj[k])
+                    except ValueError:
+                        obj_res[k] = obj[k]
+                elif k in ['field_name', 'table_name', 'database_name', 'card_name', 'pseudo_table_card_name', 'dashboard_name'] and obj[k][0] == '%':
                     [new_k, value] = self.convert_pcnames2id(database_name, k, obj[k])
                     obj_res.pop(k)
                     obj_res[new_k] = value
@@ -442,11 +452,10 @@ class MetabaseApi:
                                 t = self.table_id2name(database_name, int(id))
                                 obj_res['table_name'] = '%'+k+'%'+t
                             except ValueError:
-                                res = id.split('_')
-                                if res[0] == 'card':
-                                    c = self.card_id2name(database_name, int(res[2]))
-                                    obj_res['pseudo_table_name_card'] = '%'+k+'%'+c
-                    elif k in ['card_id']:
+                                if id[0:6] == 'card__':
+                                    c = self.card_id2name(database_name, int(id[6:]))
+                                    obj_res['pseudo_table_card_name'] = '%'+k+'%'+c
+                    elif k == 'card_id':
                         id = obj_res.pop(k)
                         if id:
                             n = self.card_id2name(database_name, int(id))
@@ -454,6 +463,9 @@ class MetabaseApi:
                     elif k in ['database_id', 'database']:
                         obj_res.pop(k)
                         obj_res['database_name'] = '%'+k+'%'
+                    elif k == 'dashboard_id':
+                        id = obj_res.pop(k)
+                        obj_res['dashboard_name'] = '%'+k+'%'+self.dashboard_id2name(database_name, id)
         return obj_res
 
     def export_dashboards_to_json(self, database_name, filename):
