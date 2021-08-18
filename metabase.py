@@ -68,6 +68,8 @@ class MetabaseApi:
                 raise ConnectionError(query_response)
             if query_response.get('_status') == 500:
                 raise ConnectionError(query_response)
+            if query_response.get('via'):
+                raise ConnectionError(query_response)
         except AttributeError:
             return query_response
         except ValueError:
