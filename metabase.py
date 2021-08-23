@@ -540,3 +540,26 @@ class MetabaseApi:
                 for ocard in dash['ordered_cards']:
                     res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
         return res
+
+    def get_users(self):
+        self.create_session_if_needed()
+        users = self.query('GET', 'user?status=all')
+        try:
+            return users['data']
+        except:
+            return None
+
+    def user_email2if(self, user_email):
+        for u in self.get_users():
+            if u['email'] == user_email:
+                return u['id']
+        return None
+
+    def create_user(self, email, password, extra = {}):
+        self.create_session_if_needed()
+        extra['email'] = email
+        extra['password'] = password
+        user_id = self.user_email2if(email)
+        if (user_id):
+            return self.query('PUT', 'user/'+str(user_id), extra)
+        return self.query('POST', 'user', extra)
