@@ -284,11 +284,12 @@ class MetabaseApi:
         return self.query('PUT', 'field/'+data['id'], data)
 
     def database_name2id(self, database_name):
-        if self.database_export is None:
-            self.database_export = self.get_database(database_name, True)
-        if not self.database_export.get('id'):
-            raise ConnectionError('Unknown database name '+database_name)
-        return self.database_export['id']
+        self.create_session_if_needed()
+        data = self.query('GET', 'database')
+        for d in data['data']:
+            if d['name'] == database_name:
+                return d['id']
+        return None
 
     def get_cards(self, database_name):
         database_id = self.database_name2id(database_name)
