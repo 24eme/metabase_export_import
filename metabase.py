@@ -564,3 +564,55 @@ class MetabaseApi:
         if (user_id):
             return self.query('PUT', 'user/'+str(user_id), extra)
         return self.query('POST', 'user', extra)
+
+    def create_group(self, group_name):
+        self.create_session_if_needed()
+        return self.query('POST', 'permissions/group', {'name': group_name})
+
+    def get_groups(self):
+        self.create_session_if_needed()
+        groups = self.query('GET', 'permissions/group')
+        try:
+            return groups
+        except:
+            return None
+
+    def group_name2id(self, group_name):
+        for g in self.get_groups():
+            if g['name'] == group_name:
+                return g['id']
+        return None
+
+    def get_memberships(self):
+        self.create_session_if_needed()
+        return self.query('GET', 'permissions/membership')
+
+    def membership_add(self, user_email, group_name):
+        self.create_session_if_needed()
+        user_id = self.user_email2id(user_email)
+        group_id = self.group_name2id(group_name)
+        if (not group_id):
+            group = self.create_group(group_name)
+            group_id = group['id']
+        memberships = self.get_memberships()
+        for m in memberships[str(user_id)]:
+            if m['group_id'] == group_id:
+                return m
+        return self.query('POST', 'permissions/membership', {'group_id': group_id, 'user_id': user_id})
+
+    def permission_get_database(self):
+        self.create_session_if_needed()
+        return self.query('GET', 'permissions/graph')
+
+    def permission_set_database(self, group_name, database_name, schema_data, native_sql):
+        group_id = self.group_name2id(group_name)
+        database_id = self.database_name2id(database_name)
+        data = self.permission_get_database()
+        if not data['groups'].get(group_id):
+            data['groups'][group_id] = {}
+        data['groups'][group_id][database_id] = {}
+        if native_sql:
+            data['groups'][group_id][database_id]['native'] = 'write'
+        if schema_data:
+            data['groups'][group_id][database_id]['schemas'] = 'all'
+        return self.query('PUT', 'permissions/graph', data)
