@@ -550,7 +550,7 @@ class MetabaseApi:
         except:
             return None
 
-    def user_email2if(self, user_email):
+    def user_email2id(self, user_email):
         for u in self.get_users():
             if u['email'] == user_email:
                 return u['id']
@@ -560,7 +560,7 @@ class MetabaseApi:
         self.create_session_if_needed()
         extra['email'] = email
         extra['password'] = password
-        user_id = self.user_email2if(email)
+        user_id = self.user_email2id(email)
         if (user_id):
             return self.query('PUT', 'user/'+str(user_id), extra)
         return self.query('POST', 'user', extra)
