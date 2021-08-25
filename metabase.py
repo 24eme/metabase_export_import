@@ -668,3 +668,25 @@ class MetabaseApi:
             data['groups'][group_id][database_id]['native'] = 'none'
             data['groups'][group_id][database_id]['schemas'] = 'none'
         return self.query('PUT', 'permissions/graph', data)
+
+    def permission_get_collection(self):
+        self.create_session_if_needed()
+        return self.query('GET', 'collection/graph')
+
+    def permission_set_collection(self, group_name, collection_name, right):
+        if not right in ['read', 'write', 'none']:
+            raise ValueError('right not read/write/none')
+        if group_name == 'all':
+            group_id = '1'
+        else:
+            group_id = self.group_name2id(group_name)
+        if not group_id:
+            raise ValueError("group "+group_name+" not found")
+        collection_id = self.collection_name2id(collection_name)
+        if not collection_id:
+            raise ValueError("collection "+collection_name+" not found")
+        data = self.permission_get_collection()
+        if not data['groups'].get(group_id):
+            data['groups'][group_id] = {}
+        data['groups'][group_id][collection_id] = right
+        return self.query('PUT', 'collection/graph', data)
