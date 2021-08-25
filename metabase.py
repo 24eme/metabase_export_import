@@ -649,14 +649,22 @@ class MetabaseApi:
         return self.query('GET', 'permissions/graph')
 
     def permission_set_database(self, group_name, database_name, schema_data, native_sql):
-        group_id = self.group_name2id(group_name)
-        database_id = self.database_name2id(database_name)
+        if group_name == 'all':
+            group_id = '1'
+        else:
+            group_id = self.group_name2id(group_name)
+        database_id = str(self.database_name2id(database_name))
         data = self.permission_get_database()
         if not data['groups'].get(group_id):
             data['groups'][group_id] = {}
         data['groups'][group_id][database_id] = {}
         if native_sql:
             data['groups'][group_id][database_id]['native'] = 'write'
-        if schema_data:
-            data['groups'][group_id][database_id]['schemas'] = 'all'
+            if schema_data:
+                data['groups'][group_id][database_id]['schemas'] = 'all'
+            else:
+                data['groups'][group_id][database_id].pop('schemas', None)
+        else:
+            data['groups'][group_id][database_id]['native'] = 'none'
+            data['groups'][group_id][database_id]['schemas'] = 'none'
         return self.query('PUT', 'permissions/graph', data)
