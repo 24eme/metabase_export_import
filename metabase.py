@@ -14,6 +14,7 @@ class MetabaseApi:
         self.cards_export = None
         self.dashboards_name2id = {}
         self.cards_name2id = {}
+        self.collections_name2id = {}
         
     def query (self, method, query_name, json_data = None):
         json_str = None
@@ -71,6 +72,8 @@ class MetabaseApi:
             if query_response.get('via'):
                 raise ConnectionError(query_response)
         except AttributeError:
+            if r.text.find('endpoint') > -1:
+                raise ConnectionError(query_url+" ("+method+"): "+r.text)
             return query_response
         except ValueError:
             if (r.text):
@@ -295,8 +298,8 @@ class MetabaseApi:
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'card?f=database&model_id='+str(database_id))
 
-    def get_collections(self, database_name):
-        database_id = self.database_name2id(database_name)
+    def get_collections(self):
+        self.create_session_if_needed()
         return self.query('GET', 'collection')
 
     def get_dashboard(self, database_name, dashboard_name):
@@ -340,7 +343,36 @@ class MetabaseApi:
                 self.cards_name2id[c['name']] = c['id']
         return self.cards_name2id.get(card_name)
 
-    def convert_pcnames2id(self, database_name, fieldname, pcnames):
+    def collection_name2id(self, collection_name):
+        if not self.collections_name2id:
+            for c in self.get_collections():
+                self.collections_name2id[c['name']] = c['id']
+        return self.collections_name2id.get(collection_name)
+
+    def collection_name2id_or_create_it(self, collection_name):
+        cid = self.collection_name2id(collection_name)
+        if cid:
+            return cid
+        self.create_collection(collection_name)
+        return self.collection_name2id(collection_name)
+
+    def create_collection(self, collection_name, parent_collection_name = None, param = {}):
+        self.create_session_if_needed()
+        param['name'] = collection_name
+        parent_id = None
+        if parent_collection_name:
+            parent_id = self.collection_name2id_or_create_it(parent_collection_name)
+            if parent_id:
+                param['parent_id'] = parent_id
+        if not param.get('color'):
+            param['color'] = '#509ee3'
+        cid = self.collection_name2id(collection_name)
+        self.collections_name2id = {}
+        if cid:
+            return self.query('PUT', 'collection/'+str(cid), param)
+        return self.query('POST', 'collection', param)
+
+    def convert_pcnames2id(self, database_name, collection_name, fieldname, pcnames):
         if pcnames[0] != '%':
             raise ValueError('Not a convertible value')
         sep = pcnames.find('%', 1)
@@ -348,10 +380,12 @@ class MetabaseApi:
             raise ValueError('Not a convertible value')
         [new_k, names] = pcnames[1:sep], pcnames[sep+1:]
         if new_k == 'JSONCONV':
-            data = self.convert_names2ids(database_name, json.loads(names))
+            data = self.convert_names2ids(database_name, collection_name, json.loads(names))
             return [json.dumps(data), None]
         if fieldname == 'database_name':
             return [new_k, self.database_name2id(database_name)]
+        if fieldname == 'collection_name':
+            return [new_k, self.collection_name2id_or_create_it(collection_name)]
         if fieldname == 'card_name':
             return [new_k, self.card_name2id(database_name, names)]
         if fieldname == 'dashboard_name':
@@ -372,33 +406,33 @@ class MetabaseApi:
             return [new_k, table_id]
         raise ValueError('Unknown '+str(fieldname)+' %'+str(new_k)+'% type')
 
-    def convert_names2ids(self, database_name, obj):
+    def convert_names2ids(self, database_name, collection_name, obj):
         obj_res = obj
         if isinstance(obj, list):
             if len(obj) and obj[0] == 'field':
                 if obj[1][0] == '%':
-                    [k_name, value] = self.convert_pcnames2id(database_name, None, obj[1])
+                    [k_name, value] = self.convert_pcnames2id(database_name, collection_name, None, obj[1])
                     obj_res[1] = value
             else:
                 for i in range(len(obj)):
-                    obj_res[i] = self.convert_names2ids(database_name, obj[i])
+                    obj_res[i] = self.convert_names2ids(database_name, collection_name, obj[i])
         elif isinstance(obj, dict):
             obj_res = obj.copy()
             for k in obj.keys():
                 if k[0] == '%':
                     try:
-                        [new_k, value] = self.convert_pcnames2id(database_name, None, k)
+                        [new_k, value] = self.convert_pcnames2id(database_name, collection_name, None, k)
                         obj_res.pop(k)
-                        obj_res[new_k] = self.convert_names2ids(database_name, obj[k])
+                        obj_res[new_k] = self.convert_names2ids(database_name, collection_name, obj[k])
                     except ValueError:
                         obj_res[k] = obj[k]
-                elif k in ['field_name', 'table_name', 'database_name', 'card_name', 'pseudo_table_card_name', 'dashboard_name'] and obj[k][0] == '%':
-                    [new_k, value] = self.convert_pcnames2id(database_name, k, obj[k])
+                elif k in ['field_name', 'table_name', 'database_name', 'card_name', 'pseudo_table_card_name', 'dashboard_name', 'collection_name'] and obj[k][0] == '%':
+                    [new_k, value] = self.convert_pcnames2id(database_name, collection_name, k, obj[k])
                     obj_res.pop(k)
                     obj_res[new_k] = value
                 else:
                     if isinstance(obj[k], dict) or isinstance(obj[k], list):
-                        obj_res[k] = self.convert_names2ids(database_name, obj[k])
+                        obj_res[k] = self.convert_names2ids(database_name, collection_name, obj[k])
         return obj_res
 
     def convert_ids2names(self, database_name, obj, previous_key):
@@ -416,6 +450,9 @@ class MetabaseApi:
         elif isinstance(obj, dict):
             obj_res = obj.copy()
             for k in obj.keys():
+                if k == 'collection':
+                    obj_res.pop(k)
+                    continue
                 if isinstance(obj[k], dict) or isinstance(obj[k], list):
                     k_previous = previous_key
                     k2int = None
@@ -468,6 +505,9 @@ class MetabaseApi:
                     elif k in ['database_id', 'database']:
                         obj_res.pop(k)
                         obj_res['database_name'] = '%'+k+'%'
+                    elif k == 'collection_id':
+                        obj_res.pop(k)
+                        obj_res['collection_name'] = '%'+k+'%'
                     elif k == 'dashboard_id':
                         id = obj_res.pop(k)
                         obj_res['dashboard_name'] = '%'+k+'%'+self.dashboard_id2name(database_name, id)
@@ -514,14 +554,14 @@ class MetabaseApi:
             ordered_card_from_json.pop('card')
             return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
 
-    def import_cards_from_json(self, database_name, filename):
+    def import_cards_from_json(self, database_name, filename, collection_name = None):
         res = []
         with open(filename, 'r', newline = '') as jsonfile:
             jsondata = json.load(jsonfile)
             errors = None
             for card in jsondata:
                 try:
-                    res.append(self.card_import(database_name, self.convert_names2ids(database_name, card)))
+                    res.append(self.card_import(database_name, self.convert_names2ids(database_name, collection_name, card)))
                 except ValueError as e:
                     if not errors:
                         errors = e
@@ -531,10 +571,10 @@ class MetabaseApi:
                 raise errors
         return res
 
-    def import_dashboards_from_json(self, database_name, filename):
+    def import_dashboards_from_json(self, database_name, filename, collection_name = None):
         res = [[], [], []]
         with open(filename, 'r', newline = '') as jsonfile:
-            jsondata = self.convert_names2ids(database_name, json.load(jsonfile))
+            jsondata = self.convert_names2ids(database_name, collection_name, json.load(jsonfile))
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
                 self.dashboard_delete_all_cards(database_name, dash['name'])
