@@ -360,8 +360,9 @@ class MetabaseApi:
         self.create_collection(collection_name)
         return self.collection_name2id(collection_name)
 
-    def create_collection(self, collection_name, parent_collection_name = None, param = {}):
+    def create_collection(self, collection_name, parent_collection_name = None, param_args = {}):
         self.create_session_if_needed()
+        param = param_args.copy()
         param['name'] = collection_name
         parent_id = None
         if parent_collection_name:
