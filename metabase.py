@@ -289,6 +289,10 @@ class MetabaseApi:
     def database_name2id(self, database_name):
         self.create_session_if_needed()
         data = self.query('GET', 'database')
+        if isinstance(data, list):
+            newdata = {}
+            newdata['data'] = data
+            data = newdata
         for d in data['data']:
             if d['name'] == database_name:
                 return d['id']
