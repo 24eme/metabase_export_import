@@ -653,7 +653,11 @@ class MetabaseApi:
             group_id = '1'
         else:
             group_id = self.group_name2id(group_name)
-        database_id = str(self.database_name2id(database_name))
+        if not group_id:
+            raise ValueError("group "+group_name+" not found")
+        database_id = self.database_name2id(database_name)
+        if not database_id:
+            raise ValueError("database "+database_name+" not found")
         data = self.permission_get_database()
         if not data['groups'].get(group_id):
             data['groups'][group_id] = {}
