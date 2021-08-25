@@ -687,7 +687,10 @@ class MetabaseApi:
             group_id = self.group_name2id(group_name)
         if not group_id:
             raise ValueError("group "+group_name+" not found")
-        collection_id = self.collection_name2id(collection_name)
+        if collection_name == 'root':
+            collection_id = 'root'
+        else:
+            collection_id = self.collection_name2id(collection_name)
         if not collection_id:
             raise ValueError("collection "+collection_name+" not found")
         data = self.permission_get_collection()
