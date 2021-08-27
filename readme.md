@@ -2,7 +2,21 @@
 
 This python library allows to export and import a community version instance of Metabase
 
-## database creation/deletion
+## Example scripts
+
+Two scripts are provided to import and export fields, cards and dashboards of a specific database configuration of metabase :
+
+    python3 metabase_export.py http://localhost:3000/api/ my_user my_password my_database
+
+The script produces 3 files for each exported elements (the name of the database is user as prefix) : `my_database_fields_exported.csv`, `my_database_cards_exported.json` and `my_database_dashboard_exported.json`
+
+    python3 metabase_import.py http://localhost:3000/api/ my_user my_password my_database
+
+The script imports from 3 files, one for each elements : `my_database_fields_forimport.csv`, `my_database_cards_forimport.json` and `my_database_dashboard_forimport.json`
+
+## Library calls
+
+### database creation/deletion
 
     import metabase
     
@@ -14,7 +28,7 @@ This python library allows to export and import a community version instance of 
 
     #ametabase.delete_database('my_database')
 
-## users and permisssions
+### users and permisssions
 
     ametabase.create_user("user@example.org", "the_password", {'first_name': 'John', 'last_name': 'Doe'})
     
@@ -24,7 +38,7 @@ This python library allows to export and import a community version instance of 
     #allow read data and create interraction with my_database for users members of our new group (a_group)
     ametabase.permission_set_database('a_group', 'my_database', True, True)
 
-## collections and permissions
+### collections and permissions
 
     #create a collection and its sub collection
     ametabase.create_collection('sub_collection', 'main_collection')
@@ -33,13 +47,13 @@ This python library allows to export and import a community version instance of 
     ametabase.permission_set_collection('main_collection', 'a_group', 'write')
     ametabase.permission_set_collection('sub_collection', 'a_group', 'write')
 
-## schema
+### schema
 
     #export and import the schema of fields
     ametabase.export_fields_to_csv('my_database', 'my_database_fields.csv')
     ametabase.import_fields_from_csv('my_database', 'my_database_fields.csv')
 
-## cards and dashboards
+### cards and dashboards
 
     ametabase.export_cards_to_json('my_database', 'my_database_cards.json')
     ametabase.export_dashboards_to_json('my_database', 'my_database_dashboard.json')
