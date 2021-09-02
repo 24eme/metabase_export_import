@@ -13,5 +13,6 @@ ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_pa
 #ametabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
 
 ametabase.import_fields_from_csv(metabase_base, metabase_base+'_fields__forimport.csv')
+ametabase.import_metrics_from_json(metabase_base, metabase_base+'_metrics__forimport.csv')
 ametabase.import_cards_from_json(metabase_base, metabase_base+'_cards_forimport.json')
 ametabase.import_dashboards_from_json(metabase_base, metabase_base+'_dashboard_forimport.json')

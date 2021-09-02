@@ -12,6 +12,7 @@ ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_pa
 #ametabase.delete_database('base')
 #ametabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
 
-ametabase.export_fields_to_csv(metabase_base, metabase_base+'_fields_exported.csv')
-ametabase.export_cards_to_json(metabase_base, metabase_base+'_cards_exported.json')
-ametabase.export_dashboards_to_json(metabase_base, metabase_base+'_dashboard_exported.json')
+ametabase.export_fields_to_csv(metabase_base, metabase_base+'_exported_fields.csv')
+ametabase.export_cards_to_json(metabase_base, metabase_base+'_exported_cards.json')
+ametabase.export_dashboards_to_json(metabase_base, metabase_base+'_exported_dashboard.json')
+ametabase.export_metrics_to_json(metabase_base, metabase_base+'_exported_metrics.json')
