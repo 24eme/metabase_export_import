@@ -675,6 +675,16 @@ class MetabaseApi:
             return self.query('PUT', 'user/'+str(user_id), extra)
         return self.query('POST', 'user', extra)
 
+    def user_password(self, email, password):
+        self.create_session_if_needed()
+        data = {}
+        data['email'] = email
+        data['password'] = password
+        user_id = self.user_email2id(email)
+        if not user_id:
+            raise ValueError('known user '+email)
+        return self.query('PUT', 'user/'+str(user_id)+'/password', data)
+
     def create_group(self, group_name):
         self.create_session_if_needed()
         return self.query('POST', 'permissions/group', {'name': group_name})
