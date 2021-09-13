@@ -354,9 +354,7 @@ class MetabaseApi:
         return self.dashboards_name2id.get(dashboard_name)
 
     def dashboard_id2name(self, database_name, dashboard_id):
-        if not self.dashboards_name2id:
-            for d in self.get_dashboards(database_name):
-                self.dashboards_name2id[d['name']] = d['id']
+        self.dashboard_name2id(database_name, "a")
         for dname in self.dashboards_name2id.keys():
             if self.dashboards_name2id[dname] == dashboard_id:
                 return dname
