@@ -329,7 +329,7 @@ class MetabaseApi:
             res = self.query('GET', 'dashboard/'+str(d['id']))
             good_db = True
             for c in res['ordered_cards']:
-                if c['card']['database_id'] != database_id:
+                if c['card'].get('database_id') and c['card'].get('database_id') != database_id:
                     good_db = False
                     continue
             if not good_db:
@@ -544,8 +544,9 @@ class MetabaseApi:
                             n = self.card_id2name(database_name, int(id))
                             obj_res['card_name'] = '%'+k+'%'+n
                     elif k in ['database_id', 'database']:
-                        obj_res.pop(k)
-                        obj_res['database_name'] = '%'+k+'%'
+                        if obj.get(k):
+                            obj_res.pop(k)
+                            obj_res['database_name'] = '%'+k+'%'
                     elif k == 'collection_id':
                         obj_res.pop(k)
                         obj_res['collection_name'] = '%'+k+'%'
