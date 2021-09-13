@@ -601,11 +601,11 @@ class MetabaseApi:
 
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
         dashid = self.dashboard_name2id(database_name, dashboard_name)
-        cardid = ordered_card_from_json['card_id']
+        cardid = ordered_card_from_json.get('card_id')
         if cardid:
             ordered_card_from_json['cardId'] = cardid
             ordered_card_from_json.pop('card')
-            return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
+        return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
 
     def import_cards_from_json(self, database_name, filename, collection_name = None):
         res = []
