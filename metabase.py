@@ -14,7 +14,7 @@ class MetabaseApi:
         self.database_export = None
         self.cards_export = None
         self.metrics_export = None
-        self.dashboards_name2id = {}
+        self.dashboards_name2id = None
         self.cards_name2id = {}
         self.collections_name2id = {}
         self.metrics_name2id = {}
@@ -348,7 +348,8 @@ class MetabaseApi:
 
     def dashboard_name2id(self, database_name, dashboard_name):
         if not self.dashboards_name2id:
-            for d in self.get_dashboards(database_name):
+            self.dashboards_name2id = {}
+            for d in self.query('GET', 'dashboard'):
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
 
@@ -572,7 +573,7 @@ class MetabaseApi:
         dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
         if dashid:
             return self.query('PUT', 'dashboard/'+str(dashid), dash_from_json)
-        self.dashboards_name2id = {}
+        self.dashboards_name2id = None
         return self.query('POST', 'dashboard', dash_from_json)
 
     def card_import(self, database_name, card_from_json):
