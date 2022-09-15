@@ -349,7 +349,10 @@ class MetabaseApi:
     def dashboard_name2id(self, database_name, dashboard_name):
         if not self.dashboards_name2id:
             self.dashboards_name2id = {}
-            for d in self.query('GET', 'dashboard'):
+            for d in self.get_dashboards(database_name):
+                if self.dashboards_name2id.get(d['name']):
+                    print("dashboard "+d['name']+" not unique (already registered with id "+str(self.dashboards_name2id.get(d['name']))+" and trying to create it with id "+str(d['id'])+")")
+                    continue
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
 
@@ -550,7 +553,10 @@ class MetabaseApi:
                         obj_res['collection_name'] = '%'+k+'%'
                     elif k == 'dashboard_id':
                         id = obj_res.pop(k)
-                        obj_res['dashboard_name'] = '%'+k+'%'+self.dashboard_id2name(database_name, id)
+                        name = self.dashboard_id2name(database_name, id)
+                        if not name:
+                            raise Exception("no name for dashboard "+str(id))
+                        obj_res['dashboard_name'] = '%'+k+'%'+name
         return obj_res
 
     def export_dashboards_to_json(self, database_name, filename):
