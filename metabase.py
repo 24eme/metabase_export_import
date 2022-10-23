@@ -111,25 +111,28 @@ class MetabaseApi:
 
     def create_database(self, name, engine, details, is_full_sync=True, is_on_demand=False, auto_run_queries=True):
         self.create_session_if_needed()
-        data = self.get_database(name)
+        data = self.get_database(name, False, False)
         if data:
             return data
         return self.query('POST', 'database', {"name": name, 'engine': engine, "details": details, "is_full_sync": is_full_sync, "is_on_demand": is_on_demand, "auto_run_queries": auto_run_queries})
 
-    def get_database(self, name, full_info=False):
+    def get_database(self, name, full_info=False, check_if_exists=True):
         name2database = {}
         for database in self.get_databases():
             name2database[database['name']] = database
         data = name2database.get(name)
-        if not data:
+        if not data and not check_if_exists:
             return {}
+        if not data:
+            raise ValueError("Database \"" + name + "\" does not exist. Existing databases are: " + ', '.join(name2database.keys()))
         if not full_info:
             return data
+
         return self.query('GET', 'database/'+str(data['id'])+'?include=tables.fields')
 
     def delete_database(self, name):
         self.create_session_if_needed()
-        data = self.get_database(name)
+        data = self.get_database(name, False, False)
         if not data:
             return
         return self.query('DELETE', 'database/'+str(data['id']), {'id': data['id']})
