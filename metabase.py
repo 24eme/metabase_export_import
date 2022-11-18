@@ -2,6 +2,7 @@ import requests
 import json
 import csv
 import datetime
+import os
 
 class MetabaseApi:
     def __init__(self, apiurl, username, password, debug=False):
@@ -256,11 +257,11 @@ class MetabaseApi:
                               })
         return result
 
-    def export_fields_to_csv(self, database_name, filename):
+    def export_fields_to_csv(self, database_name, dirname):
         export = self.export_fields(database_name)
         if not export:
             return
-        with open(filename, 'w', newline = '') as csvfile:
+        with open(dirname+"/fields.csv", 'w', newline = '') as csvfile:
             my_writer = csv.writer(csvfile, delimiter = ',')
             need_header = True
             for row in export:
@@ -269,9 +270,9 @@ class MetabaseApi:
                     need_header = False
                 my_writer.writerow(row.values())
 
-    def import_fields_from_csv(self, database_name, filename):
+    def import_fields_from_csv(self, database_name, dirname):
         fields = []
-        with open(filename, newline='') as csvfile:
+        with open(dirname+"/fields.csv", newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 fields.append(row)
@@ -562,20 +563,58 @@ class MetabaseApi:
                         obj_res['dashboard_name'] = '%'+k+'%'+name
         return obj_res
 
-    def export_dashboards_to_json(self, database_name, filename):
+    def export_dashboards_to_json(self, database_name, dirname):
         export = self.get_dashboards(database_name)
-        with open(filename, 'w', newline = '') as jsonfile:
-            jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
+        for dash in export:
+            if len(dash['ordered_cards']):
+                dash = self.clean_object(dash)
+                with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+                    jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None)))
 
-    def export_cards_to_json(self, database_name, filename):
+    def clean_object(self, object):
+        if 'updated_at' in object:
+            del object['updated_at']
+        if 'created_at' in object:
+            del object['created_at']
+        if 'id' in object:
+            del object['id']
+        if 'creator' in object:
+            del object['creator']
+        if 'last-edit-info' in object:
+            del object['last-edit-info']
+        if 'result_metadata' in object and object['result_metadata']:
+            for i in range(0, len(object['result_metadata'])):
+                del object['result_metadata'][i]['fingerprint']
+        if 'ordered_cards' in object:
+            for c in object['ordered_cards']:
+                c = self.clean_object(c)
+        if 'card' in object:
+            object['card'] = self.clean_object(object['card'])
+        if 'query_average_duration' in object:
+            del object['query_average_duration']
+        if 'creator_id' in object:
+            del object['creator_id']
+        if 'made_public_by_id' in object:
+            del object['made_public_by_id']
+        if 'param_values' in object:
+            del object['param_values']
+        if 'public_uuid' in object:
+            del object['public_uuid']
+        return object
+
+    def export_cards_to_json(self, database_name, dirname):
         export = self.get_cards(database_name)
-        with open(filename, 'w', newline = '') as jsonfile:
-            jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
+        for card in export:
+            card = self.clean_object(card)
+            with open(dirname+"/card_"+card['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, card, None)))
 
-    def export_metrics_to_json(self, database_name, filename):
+    def export_metrics_to_json(self, database_name, dirname):
         export = self.get_metrics(database_name)
-        with open(filename, 'w', newline = '') as jsonfile:
-            jsonfile.write(json.dumps(self.convert_ids2names(database_name, export, None)))
+        for metric in export:
+            metric = self.clean_object(metric)
+            with open(dirname+"/metric_"+metric['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, metric, None)))
 
     def dashboard_import(self, database_name, dash_from_json):
         dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
@@ -616,44 +655,65 @@ class MetabaseApi:
             ordered_card_from_json.pop('card')
         return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
 
-    def import_cards_from_json(self, database_name, filename, collection_name = None):
+    def import_cards_from_json(self, database_name, dirname, collection_name = None):
         res = []
-        with open(filename, 'r', newline = '') as jsonfile:
-            jsondata = json.load(jsonfile)
+        jsondata = self.get_json_data('card_', dirname)
+        for dash in self.get_json_data('dashboard_', dirname):
+            for embed_card in dash['ordered_cards']:
+                if embed_card and embed_card['card']:
+                    jsondata.append(embed_card['card'])
+        if len(jsondata):
             errors = None
             for card in jsondata:
                 try:
                     res.append(self.card_import(database_name, self.convert_names2ids(database_name, collection_name, card)))
                 except ValueError as e:
                     if not errors:
-                        errors = e
+                        errors = ValueError(card['name']+": "+ str(e))
                     else:
-                        errors = ValueError(str(errors) + " / " + str(e))
+                        errors = ValueError(card['name']+": "+str(errors) + " ;\n" + str(e))
             if errors:
                 raise errors
         return res
 
-    def import_metrics_from_json(self, database_name, filename, collection_name = None):
+    def importfiles_from_dirname(self, prefix, dirname):
+        files = []
+        for file in os.listdir(dirname):
+            if file.find(prefix) > -1:
+                files.append(dirname+'/'+file)
+        return files
+
+    def get_json_data(self, prefix, dirname):
+        jsondata = []
+        for filename in self.importfiles_from_dirname(prefix, dirname):
+            with open(filename, 'r', newline = '') as jsonfile:
+                data = json.load(jsonfile)
+                if len(data):
+                    jsondata.append(data)
+        return jsondata
+
+    def import_metrics_from_json(self, database_name, dirname, collection_name = None):
         res = []
-        with open(filename, 'r', newline = '') as jsonfile:
-            jsondata = json.load(jsonfile)
+        jsondata = self.get_json_data('metric_', dirname)
+        if jsondata:
             errors = None
             for metric in jsondata:
                 try:
                     res.append(self.metric_import(database_name, self.convert_names2ids(database_name, None, metric)))
                 except ValueError as e:
                     if not errors:
-                        errors = e
+                        errors = ValueError(metric['name']+": "+ str(e))
                     else:
-                        errors = ValueError(str(errors) + " / " + str(e))
+                        errors = ValueError(metric['name']+": "+str(errors) + " ;\n" + str(e))
             if errors:
                 raise errors
         return res
 
-    def import_dashboards_from_json(self, database_name, filename, collection_name = None):
+    def import_dashboards_from_json(self, database_name, dirname, collection_name = None):
         res = [[], [], []]
-        with open(filename, 'r', newline = '') as jsonfile:
-            jsondata = self.convert_names2ids(database_name, collection_name, json.load(jsonfile))
+        jsondata = self.get_json_data('dashboard_', dirname)
+        if len(jsondata):
+            jsondata = self.convert_names2ids(database_name, collection_name, jsondata)
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
                 self.dashboard_delete_all_cards(database_name, dash['name'])

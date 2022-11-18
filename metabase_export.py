@@ -1,5 +1,6 @@
 import metabase
 import sys
+import os
 
 metabase_apiurl = sys.argv[1]
 metabase_username = sys.argv[2]
@@ -12,7 +13,12 @@ ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_pa
 #ametabase.delete_database('base')
 #ametabase.create_database('base', 'sqlite', '/path/to/db.sqlite')
 
-ametabase.export_fields_to_csv(metabase_base, metabase_base+'_exported_fields.csv')
-ametabase.export_cards_to_json(metabase_base, metabase_base+'_exported_cards.json')
-ametabase.export_dashboards_to_json(metabase_base, metabase_base+'_exported_dashboard.json')
-ametabase.export_metrics_to_json(metabase_base, metabase_base+'_exported_metrics.json')
+try:
+    os.mkdir("export_"+metabase_base)
+except:
+    None
+
+ametabase.export_fields_to_csv(metabase_base, "export_"+metabase_base)
+ametabase.export_cards_to_json(metabase_base, "export_"+metabase_base)
+ametabase.export_dashboards_to_json(metabase_base, "export_"+metabase_base)
+ametabase.export_metrics_to_json(metabase_base, "export_"+metabase_base)
