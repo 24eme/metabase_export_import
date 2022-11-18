@@ -17,6 +17,7 @@ class MetabaseApi:
         self.metrics_export = None
         self.dashboards_name2id = None
         self.cards_name2id = {}
+        self.snippets_name2id = {}
         self.collections_name2id = {}
         self.metrics_name2id = {}
         
@@ -313,6 +314,10 @@ class MetabaseApi:
                 return d['id']
         return None
 
+    def get_snippets(self, database_name):
+        database_id = self.database_name2id(database_name)
+        return self.query('GET', 'native-query-snippet')
+
     def get_cards(self, database_name):
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'card?f=database&model_id='+str(database_id))
@@ -366,6 +371,12 @@ class MetabaseApi:
             if self.dashboards_name2id[dname] == dashboard_id:
                 return dname
         return None
+
+    def snippet_name2id(self, database_name, snippet_name):
+        if not self.snippets_name2id:
+            for s in self.get_snippets(database_name):
+                self.snippets_name2id[s['name']] = s['id']
+        return self.snippets_name2id.get(snippet_name)
 
     def card_name2id(self, database_name, card_name):
         if not self.cards_name2id:
@@ -602,6 +613,13 @@ class MetabaseApi:
             del object['public_uuid']
         return object
 
+    def export_snippet_to_json(self, database_name, dirname):
+        export = self.get_snippets(database_name)
+        for sn in export:
+            sn = self.clean_object(sn)
+            with open(dirname+"/snippet_"+sn['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, sn, None)))
+
     def export_cards_to_json(self, database_name, dirname):
         export = self.get_cards(database_name)
         for card in export:
@@ -622,6 +640,15 @@ class MetabaseApi:
             return self.query('PUT', 'dashboard/'+str(dashid), dash_from_json)
         self.dashboards_name2id = None
         return self.query('POST', 'dashboard', dash_from_json)
+
+    def snippet_import(self, database_name, snippet_from_json):
+        if not snippet_from_json.get('description'):
+            snippet_from_json['description'] = None
+        snippetid = self.snippet_name2id(database_name, snippet_from_json['name'])
+        if snippetid:
+            return self.query('PUT', 'native-query-snippet/'+str(snippetid), snippet_from_json)
+        self.snippets_name2id = {}
+        return self.query('POST', 'native-query-snippet', snippet_from_json)
 
     def card_import(self, database_name, card_from_json):
         if not card_from_json.get('description'):
@@ -654,6 +681,25 @@ class MetabaseApi:
             ordered_card_from_json['cardId'] = cardid
             ordered_card_from_json.pop('card')
         return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
+
+    def import_snippets_from_json(self, database_name, dirname, collection_name = None):
+        res = []
+        jsondata = self.get_json_data('snippet_', dirname)
+        if len(jsondata):
+            errors = None
+            for snippet in jsondata:
+                try:
+                    data = self.convert_names2ids(database_name, collection_name, snippet)
+                    del data["collection_id"]
+                    res.append(self.snippet_import(database_name, data))
+                except ValueError as e:
+                    if not errors:
+                        errors = ValueError(snippet['name']+": "+ str(e))
+                    else:
+                        errors = ValueError(snippet['name']+": "+str(errors) + " ;\n" + str(e))
+            if errors:
+                raise errors
+        return res
 
     def import_cards_from_json(self, database_name, dirname, collection_name = None):
         res = []
