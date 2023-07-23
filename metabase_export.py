@@ -1,22 +1,65 @@
 import metabase
-import sys
-import os
+from pathlib import Path
 
-metabase_apiurl = sys.argv[1]
-metabase_username = sys.argv[2]
-metabase_password = sys.argv[3]
-metabase_base = sys.argv[4]
-metabase_exportdir = sys.argv[5]
+from typer import Typer, Option
+from typing_extensions import Annotated
 
-ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_password)
-#ametabase.debug = True
+app = Typer()
 
-try:
-    os.mkdir("export")
-except:
-    None
+db_name: str
+data_dir: Path
+metabaseAPI: metabase.MetabaseApi
 
-ametabase.export_fields_to_csv(metabase_base, metabase_exportdir)
-ametabase.export_cards_to_json(metabase_base, metabase_exportdir)
-ametabase.export_dashboards_to_json(metabase_base, metabase_exportdir)
-ametabase.export_metrics_to_json(metabase_base, metabase_exportdir)
+
+@app.command('all')
+def export_all():
+    fields()
+    cards()
+    dashboards()
+    metrics()
+
+
+@app.command()
+def fields():
+    metabaseAPI.export_fields_to_csv(db_name, str(data_dir))
+
+
+@app.command()
+def metrics():
+    metabaseAPI.export_metrics_to_json(db_name, str(data_dir))
+
+
+@app.command()
+def cards():
+    metabaseAPI.export_cards_to_json(db_name, str(data_dir))
+
+
+@app.command()
+def dashboards():
+    metabaseAPI.export_dashboards_to_json(db_name, str(data_dir))
+
+
+@app.callback()
+def common(api_url: Annotated[str, Option(envvar='MB_EXPORT_HOST')],
+           username: Annotated[str, Option(envvar='MB_EXPORT_USERNAME')],
+           password: Annotated[str, Option(envvar='MB_EXPORT_PASSWORD')],
+           database: Annotated[str, Option(envvar='MB_EXPORT_DB')],
+           data: Annotated[Path, Option(envvar='MB_DATA_DIR')],
+           verbose: bool = False):
+    global db_name, data_dir, metabaseAPI
+
+    metabaseAPI = metabase.MetabaseApi(api_url, username, password)
+    metabaseAPI.debug = verbose
+
+    db_name = database
+    data_dir = data
+
+    data_dir.mkdir(exist_ok=True)
+
+
+def main():
+    app()
+
+
+if __name__ == '__main__':
+    main()

@@ -3,6 +3,9 @@ import json
 import csv
 import datetime
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from rich.progress import Progress
+from functools import cache
 
 class MetabaseApi:
     def __init__(self, apiurl, username, password, debug=False):
@@ -101,6 +104,7 @@ class MetabaseApi:
             return;
         self.create_session()
 
+    @cache
     def get_databases(self, full_info=False):
         self.create_session_if_needed()
         url = 'database'
@@ -118,6 +122,7 @@ class MetabaseApi:
             return data
         return self.query('POST', 'database', {"name": name, 'engine': engine, "details": details, "is_full_sync": is_full_sync, "is_on_demand": is_on_demand, "auto_run_queries": auto_run_queries})
 
+    @cache
     def get_database(self, name, full_info=False, check_if_exists=True):
         name2database = {}
         for database in self.get_databases():
@@ -139,10 +144,12 @@ class MetabaseApi:
             return
         return self.query('DELETE', 'database/'+str(data['id']), {'id': data['id']})
 
+    @cache
     def get_all_tables(self):
         self.create_session_if_needed()
         return self.query('GET', 'table')
 
+    @cache
     def get_tables_of_database(self, database_name):
         self.create_session_if_needed()
         result = self.get_database(database_name, True)
@@ -151,12 +158,14 @@ class MetabaseApi:
         except KeyError:
             return {}
 
+    @cache
     def get_table(self, database_name, table_name):
         for t in self.get_tables_of_database(database_name):
             if t['name'] == table_name:
                 return t
         table = {}
 
+    @cache
     def get_field(self, database_name, table_name, field_name):
         table = self.get_table(database_name, table_name)
         try:
@@ -279,10 +288,34 @@ class MetabaseApi:
                 fields.append(row)
         return self.update_fields(database_name, fields)
 
+    def process_field(self, database_name, field):
+        # Update the field and return the result
+        return self.update_field(database_name, field)
+
     def update_fields(self, database_name, fields):
         output = []
-        for f in fields:
-            output.append(output.append(self.update_field(database_name, f)))
+
+        with Progress() as progress:
+            task = progress.add_task("[cyan]Updating fields...", total=len(fields))
+            output.append(self.update_field(database_name, fields[0]))
+            progress.update(task, advance=1)
+
+            with ThreadPoolExecutor() as executor:
+                futures = {
+                    executor.submit(self.update_field, database_name, field): field
+                    for field in fields[1:]
+                }
+
+                for future in as_completed(futures):
+                    field = futures[future]
+                    try:
+                        result = future.result()
+                        output.append(result)
+                    except Exception as e:
+                        print(f"An error occurred while processing field '{field}': {e}")
+                    finally:
+                        progress.update(task, advance=1)
+
         return output
 
     def update_field(self, database_name, field):
@@ -302,7 +335,9 @@ class MetabaseApi:
             data['fk_target_field_id'] = fk['id']
         return self.query('PUT', 'field/'+data['id'], data)
 
+    @cache
     def database_name2id(self, database_name):
+        # TODO: Optimize with cache
         self.create_session_if_needed()
         data = self.query('GET', 'database')
         if isinstance(data, list):
@@ -595,7 +630,8 @@ class MetabaseApi:
             del object['last-edit-info']
         if 'result_metadata' in object and object['result_metadata']:
             for i in range(0, len(object['result_metadata'])):
-                del object['result_metadata'][i]['fingerprint']
+                if 'fingerprint' in object['result_metadata'][i]:
+                    del object['result_metadata'][i]['fingerprint']
         if 'ordered_cards' in object:
             for c in object['ordered_cards']:
                 c = self.clean_object(c)
@@ -670,8 +706,20 @@ class MetabaseApi:
     def dashboard_delete_all_cards(self, database_name, dashboard_name):
         dash = self.get_dashboard(database_name, dashboard_name)
         res = []
-        for c in dash['ordered_cards']:
-            res.append(self.query('DELETE', 'dashboard/'+str(dash['id'])+'/cards?dashcardId='+str(c['id'])))
+
+        # Define a function to handle the query deletion
+        def delete_card(card):
+            return self.query('DELETE', 'dashboard/' + str(dash['id']) + '/cards?dashcardId=' + str(card['id']))
+
+        with ThreadPoolExecutor() as executor:
+            # Submit delete_card function for each card in dash['ordered_cards']
+            futures = [executor.submit(delete_card, card) for card in dash['ordered_cards']]
+
+            # Collect the results as tasks complete
+            for future in as_completed(futures):
+                result = future.result()
+                res.append(result)
+
         return res
 
     def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
@@ -703,23 +751,40 @@ class MetabaseApi:
 
     def import_cards_from_json(self, database_name, dirname, collection_name = None):
         res = []
-        jsondata = self.get_json_data('card_', dirname)
+        cards = self.get_json_data('card_', dirname)
         for dash in self.get_json_data('dashboard_', dirname):
             for embed_card in dash['ordered_cards']:
                 if embed_card and embed_card['card']:
-                    jsondata.append(embed_card['card'])
-        if len(jsondata):
+                    cards.append(embed_card['card'])
+        if len(cards):
             errors = None
-            for card in jsondata:
+
+            def import_card(card):
                 try:
-                    res.append(self.card_import(database_name, self.convert_names2ids(database_name, collection_name, card)))
-                except ValueError as e:
+                    return self.card_import(database_name, self.convert_names2ids(database_name, collection_name, card))
+                except (ValueError, ConnectionError) as e:
+                    nonlocal errors
                     if not errors:
-                        errors = ValueError(card['name']+": "+ str(e))
+                        errors = ValueError(card['name'] + ": " + str(e))
                     else:
-                        errors = ValueError(card['name']+": "+str(errors) + " ;\n" + str(e))
-            if errors:
-                raise errors
+                        errors = ValueError(card['name'] + ": " + str(errors) + " ;\n" + str(e))
+
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Updating cards...", total=len(cards))
+                import_card(cards[0])
+                progress.update(task, advance=1)
+
+                # Create a thread pool
+                with ThreadPoolExecutor() as executor:
+                    # Submit import_card function for each card in jsondata
+                    futures = [executor.submit(import_card, card) for card in cards[1:]]
+
+                    # Update progress as tasks complete
+                    for future in as_completed(futures):
+                        progress.update(task, advance=1)
+
+            # if errors:
+            #     raise errors
         return res
 
     def importfiles_from_dirname(self, prefix, dirname):

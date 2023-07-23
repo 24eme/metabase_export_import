@@ -1,16 +1,63 @@
 import metabase
-import sys
+from pathlib import Path
 
-metabase_apiurl = sys.argv[1]
-metabase_username = sys.argv[2]
-metabase_password = sys.argv[3]
-metabase_base = sys.argv[4]
-metabase_exportdir = sys.argv[5]
+from typer import Typer, Option
+from typing_extensions import Annotated
 
-ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_password)
-#ametabase.debug = True
+app = Typer()
 
-ametabase.import_fields_from_csv(metabase_base, metabase_exportdir)
-ametabase.import_metrics_from_json(metabase_base, metabase_exportdir)
-ametabase.import_cards_from_json(metabase_base, metabase_exportdir)
-ametabase.import_dashboards_from_json(metabase_base, metabase_exportdir)
+db_name: str
+data_dir: Path
+metabaseAPI: metabase.MetabaseApi
+
+
+@app.command('all')
+def import_all(collection: str):
+    fields()
+    metrics()
+    cards(collection)
+    dashboards(collection)
+
+
+@app.command()
+def fields():
+    metabaseAPI.import_fields_from_csv(db_name, str(data_dir))
+
+
+@app.command()
+def metrics():
+    metabaseAPI.import_metrics_from_json(db_name, str(data_dir))
+
+
+@app.command()
+def cards(collection: str):
+    metabaseAPI.import_cards_from_json(db_name, str(data_dir), collection)
+
+
+@app.command()
+def dashboards(collection: str):
+    metabaseAPI.import_dashboards_from_json(db_name, str(data_dir), collection)
+
+
+@app.callback()
+def common(api_url: Annotated[str, Option(envvar='MB_EXPORT_HOST')],
+           username: Annotated[str, Option(envvar='MB_EXPORT_USERNAME')],
+           password: Annotated[str, Option(envvar='MB_EXPORT_PASSWORD')],
+           database: Annotated[str, Option(envvar='MB_EXPORT_DB')],
+           data: Annotated[Path, Option(envvar='MB_DATA_DIR')],
+           verbose: bool = False):
+    global db_name, data_dir, metabaseAPI
+
+    metabaseAPI = metabase.MetabaseApi(api_url, username, password)
+    metabaseAPI.debug = verbose
+
+    db_name = database
+    data_dir = data
+
+
+def main():
+    app()
+
+
+if __name__ == '__main__':
+    main()
