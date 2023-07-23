@@ -40,16 +40,16 @@ def dashboards(collection: str):
 
 
 @app.callback()
-def common(api_url: Annotated[str, Option(envvar='MB_EXPORT_HOST')],
-           username: Annotated[str, Option(envvar='MB_EXPORT_USERNAME')],
-           password: Annotated[str, Option(envvar='MB_EXPORT_PASSWORD')],
-           database: Annotated[str, Option(envvar='MB_EXPORT_DB')],
+def common(api_url: Annotated[str, Option(envvar='MB_IMPORT_HOST')],
+           username: Annotated[str, Option(envvar='MB_IMPORT_USERNAME')],
+           password: Annotated[str, Option(envvar='MB_IMPORT_PASSWORD')],
+           database: Annotated[str, Option(envvar='MB_IMPORT_DB')],
            data: Annotated[Path, Option(envvar='MB_DATA_DIR')],
-           verbose: bool = False):
+           verbose: bool = False,
+           dry_run: bool = False):
     global db_name, data_dir, metabaseAPI
 
-    metabaseAPI = metabase.MetabaseApi(api_url, username, password)
-    metabaseAPI.debug = verbose
+    metabaseAPI = metabase.MetabaseApi(api_url, username, password, verbose, dry_run)
 
     db_name = database
     data_dir = data

@@ -7,13 +7,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.progress import Progress
 from functools import cache
 
+
 class MetabaseApi:
-    def __init__(self, apiurl, username, password, debug=False):
+    def __init__(self, apiurl, username, password, debug: bool = False, dry_run: bool = False):
         self.apiurl = apiurl
         self.username = username
         self.password = password
         self.debug = debug
-        
+        self.dry_run = dry_run
+
         self.metabase_session = None
         self.database_export = None
         self.cards_export = None
@@ -23,54 +25,58 @@ class MetabaseApi:
         self.snippets_name2id = {}
         self.collections_name2id = {}
         self.metrics_name2id = {}
-        
-    def query (self, method, query_name, json_data = None):
+
+    def query(self, method, query_name, json_data=None):
         json_str = None
         if json_data is not None:
             json_str = json.dumps(json_data)
-        
-        headers =  { "Content-Type": "application/json;charset=utf-8" }
-        
+
+        headers = {"Content-Type": "application/json;charset=utf-8"}
+
         if self.metabase_session is not None:
             headers["X-Metabase-Session"] = self.metabase_session
-        
-        query_url = self.apiurl+query_name
-        
-        if (self.debug):
-            print(method+' '+query_url)
-            print(headers)
-            print(json_str)
-        
+
+        query_url = self.apiurl + query_name
+
+        if self.debug:
+            print(method + ' ' + query_url)
+            print('Headers:\t', headers)
+            print('Data:\t', json_str)
+
+        if self.dry_run:
+            if method != "GET" and query_name != "session":
+                return {}
+
         if method == 'POST':
             r = requests.post(
-                                query_url ,
-                                data = json_str,
-                                headers= headers
-                             )
+                query_url,
+                data=json_str,
+                headers=headers
+            )
         elif method == 'GET':
             r = requests.get(
-                                query_url,
-                                data = json_str,
-                                headers= headers
-                            )
+                query_url,
+                data=json_str,
+                headers=headers
+            )
         elif method == 'PUT':
             r = requests.put(
-                                query_url,
-                                data = json_str,
-                                headers= headers
-                            )
+                query_url,
+                data=json_str,
+                headers=headers
+            )
         elif method == 'DELETE':
             r = requests.delete(
-                                query_url,
-                                data = json_str,
-                                headers= headers
-                                )
+                query_url,
+                data=json_str,
+                headers=headers
+            )
         else:
-            raise ConnectionError('unkown method: '+method+' (GET,POST,DELETE allowed)')
-        
+            raise ConnectionError('unkown method: ' + method + ' (GET,POST,DELETE allowed)')
+
         if self.debug:
             print(r.text)
-        
+
         try:
             query_response = r.json()
             if query_response.get('errors'):
@@ -81,13 +87,13 @@ class MetabaseApi:
                 raise ConnectionError(query_response)
         except AttributeError:
             if r.text.find('endpoint') > -1:
-                raise ConnectionError(query_url+" ("+method+"): "+r.text)
+                raise ConnectionError(query_url + " (" + method + "): " + r.text)
             return query_response
         except ValueError:
             if (r.text):
                 raise ConnectionError(r.text)
             return {}
-        
+
         return query_response
 
     def create_session(self):
@@ -120,7 +126,9 @@ class MetabaseApi:
         data = self.get_database(name, False, False)
         if data:
             return data
-        return self.query('POST', 'database', {"name": name, 'engine': engine, "details": details, "is_full_sync": is_full_sync, "is_on_demand": is_on_demand, "auto_run_queries": auto_run_queries})
+        return self.query('POST', 'database',
+                          {"name": name, 'engine': engine, "details": details, "is_full_sync": is_full_sync,
+                           "is_on_demand": is_on_demand, "auto_run_queries": auto_run_queries})
 
     @cache
     def get_database(self, name, full_info=False, check_if_exists=True):
@@ -131,18 +139,19 @@ class MetabaseApi:
         if not data and not check_if_exists:
             return {}
         if not data:
-            raise ValueError("Database \"" + name + "\" does not exist. Existing databases are: " + ', '.join(name2database.keys()))
+            raise ValueError(
+                "Database \"" + name + "\" does not exist. Existing databases are: " + ', '.join(name2database.keys()))
         if not full_info:
             return data
 
-        return self.query('GET', 'database/'+str(data['id'])+'?include=tables.fields')
+        return self.query('GET', 'database/' + str(data['id']) + '?include=tables.fields')
 
     def delete_database(self, name):
         self.create_session_if_needed()
         data = self.get_database(name, False, False)
         if not data:
             return
-        return self.query('DELETE', 'database/'+str(data['id']), {'id': data['id']})
+        return self.query('DELETE', 'database/' + str(data['id']), {'id': data['id']})
 
     @cache
     def get_all_tables(self):
@@ -258,21 +267,21 @@ class MetabaseApi:
                 if not field['custom_position']:
                     field['custom_position'] = ''
                 result.append({
-                                'table_name': table_name, 'field_name': field['name'], 'description': field['description'],
-                                'semantic_type': field['semantic_type'],
-                                'foreign_table': fk_table, 'foreign_field': fk_field,
-                                'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
-                                'custom_position': field['custom_position'], 'effective_type': field['effective_type'],
-                                'base_type': field['base_type'], 'database_type': field['database_type'], 'field_id': field['id']
-                              })
+                    'table_name': table_name, 'field_name': field['name'], 'description': field['description'],
+                    'semantic_type': field['semantic_type'],
+                    'foreign_table': fk_table, 'foreign_field': fk_field,
+                    'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
+                    'custom_position': field['custom_position'], 'effective_type': field['effective_type'],
+                    'base_type': field['base_type'], 'database_type': field['database_type'], 'field_id': field['id']
+                })
         return result
 
     def export_fields_to_csv(self, database_name, dirname):
         export = self.export_fields(database_name)
         if not export:
             return
-        with open(dirname+"/fields.csv", 'w', newline = '') as csvfile:
-            my_writer = csv.writer(csvfile, delimiter = ',')
+        with open(dirname + "/fields.csv", 'w', newline='') as csvfile:
+            my_writer = csv.writer(csvfile, delimiter=',')
             need_header = True
             for row in export:
                 if need_header:
@@ -282,7 +291,7 @@ class MetabaseApi:
 
     def import_fields_from_csv(self, database_name, dirname):
         fields = []
-        with open(dirname+"/fields.csv", newline='') as csvfile:
+        with open(dirname + "/fields.csv", newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 fields.append(row)
@@ -331,9 +340,9 @@ class MetabaseApi:
                 data[k] = field[k]
             else:
                 data[k] = None
-        if fk :
+        if fk:
             data['fk_target_field_id'] = fk['id']
-        return self.query('PUT', 'field/'+data['id'], data)
+        return self.query('PUT', 'field/' + data['id'], data)
 
     @cache
     def database_name2id(self, database_name):
@@ -355,7 +364,7 @@ class MetabaseApi:
 
     def get_cards(self, database_name):
         database_id = self.database_name2id(database_name)
-        return self.query('GET', 'card?f=database&model_id='+str(database_id))
+        return self.query('GET', 'card?f=database&model_id=' + str(database_id))
 
     def get_collections(self):
         self.create_session_if_needed()
@@ -363,14 +372,14 @@ class MetabaseApi:
 
     def get_dashboard(self, database_name, dashboard_name):
         dashboard_id = self.dashboard_name2id(dashboard_name, dashboard_name)
-        return self.query('GET', 'dashboard/'+str(dashboard_id))
+        return self.query('GET', 'dashboard/' + str(dashboard_id))
 
     def get_dashboards(self, database_name):
         database_id = self.database_name2id(database_name)
         dashbords_light = self.query('GET', 'dashboard')
         dashboards = []
         for d in dashbords_light:
-            res = self.query('GET', 'dashboard/'+str(d['id']))
+            res = self.query('GET', 'dashboard/' + str(d['id']))
             good_db = True
             for c in res['ordered_cards']:
                 if c['card'].get('database_id') and c['card'].get('database_id') != database_id:
@@ -395,7 +404,9 @@ class MetabaseApi:
             self.dashboards_name2id = {}
             for d in self.get_dashboards(database_name):
                 if self.dashboards_name2id.get(d['name']):
-                    print("dashboard "+d['name']+" not unique (already registered with id "+str(self.dashboards_name2id.get(d['name']))+" and trying to create it with id "+str(d['id'])+")")
+                    print("dashboard " + d['name'] + " not unique (already registered with id " + str(
+                        self.dashboards_name2id.get(d['name'])) + " and trying to create it with id " + str(
+                        d['id']) + ")")
                     continue
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
@@ -438,7 +449,7 @@ class MetabaseApi:
         self.create_collection(collection_name)
         return self.collection_name2id(collection_name)
 
-    def create_collection(self, collection_name, parent_collection_name = None, param_args = {}):
+    def create_collection(self, collection_name, parent_collection_name=None, param_args={}):
         self.create_session_if_needed()
         param = param_args.copy()
         param['name'] = collection_name
@@ -452,7 +463,7 @@ class MetabaseApi:
         cid = self.collection_name2id(collection_name)
         self.collections_name2id = {}
         if cid:
-            return self.query('PUT', 'collection/'+str(cid), param)
+            return self.query('PUT', 'collection/' + str(cid), param)
         return self.query('POST', 'collection', param)
 
     def convert_pcnames2id(self, database_name, collection_name, fieldname, pcnames):
@@ -461,7 +472,7 @@ class MetabaseApi:
         sep = pcnames.find('%', 1)
         if sep == -1:
             raise ValueError('Not a convertible value')
-        [new_k, names] = pcnames[1:sep], pcnames[sep+1:]
+        [new_k, names] = pcnames[1:sep], pcnames[sep + 1:]
         if new_k == 'JSONCONV':
             data = self.convert_names2ids(database_name, collection_name, json.loads(names))
             return [json.dumps(data), None]
@@ -476,23 +487,23 @@ class MetabaseApi:
         if fieldname == 'pseudo_table_card_name':
             card_id = self.card_name2id(database_name, names)
             if not card_id:
-                raise ValueError('card_name '+names+' not found')
-            return [new_k, 'card__'+str(card_id)]
+                raise ValueError('card_name ' + names + ' not found')
+            return [new_k, 'card__' + str(card_id)]
         resplit = names.split('|')
         if len(resplit) == 3:
             metricid = self.metric_name2id(database_name, resplit[2])
             if metricid:
-                return[new_k, metricid]
-            raise ValueError('metric not found: '+resplit[2])
+                return [new_k, metricid]
+            raise ValueError('metric not found: ' + resplit[2])
         if len(resplit) == 2:
             field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
             if field:
-                return[new_k, field['id']]
-            raise ValueError('field not found: '+resplit[0]+'/'+resplit[1])
+                return [new_k, field['id']]
+            raise ValueError('field not found: ' + resplit[0] + '/' + resplit[1])
         if len(resplit) == 1:
             table_id = self.table_name2id(database_name, resplit[0])
             return [new_k, table_id]
-        raise ValueError('Unknown '+str(fieldname)+' %'+str(new_k)+'% type')
+        raise ValueError('Unknown ' + str(fieldname) + ' %' + str(new_k) + '% type')
 
     def convert_names2ids(self, database_name, collection_name, obj):
         obj_res = obj
@@ -514,7 +525,8 @@ class MetabaseApi:
                         obj_res[new_k] = self.convert_names2ids(database_name, collection_name, obj[k])
                     except ValueError:
                         obj_res[k] = obj[k]
-                elif k in ['field_name', 'table_name', 'database_name', 'card_name', 'pseudo_table_card_name', 'dashboard_name', 'collection_name'] and obj[k][0] == '%':
+                elif k in ['field_name', 'table_name', 'database_name', 'card_name', 'pseudo_table_card_name',
+                           'dashboard_name', 'collection_name'] and obj[k][0] == '%':
                     [new_k, value] = self.convert_pcnames2id(database_name, collection_name, k, obj[k])
                     obj_res.pop(k)
                     obj_res[new_k] = value
@@ -530,10 +542,10 @@ class MetabaseApi:
                 try:
                     if obj[0] == 'field':
                         [t, f] = self.field_id2tablenameandfieldname(database_name, int(obj_res[1]))
-                        obj_res[1] = '%%'+t+'|'+f
+                        obj_res[1] = '%%' + t + '|' + f
                     elif obj[0] == 'metric':
                         m = self.metric_id2name(database_name, int(obj_res[1]))
-                        obj_res[1] = '%%||'+m
+                        obj_res[1] = '%%||' + m
                     else:
                         for i in range(len(obj)):
                             obj_res[i] = self.convert_ids2names(database_name, obj[i], previous_key)
@@ -548,24 +560,24 @@ class MetabaseApi:
                 if isinstance(obj[k], dict) or isinstance(obj[k], list):
                     k_previous = previous_key
                     k2int = None
-                    #Cas de clé d'un dictionnaire qui sont les id de fields
+                    # Cas de clé d'un dictionnaire qui sont les id de fields
                     try:
                         k2int = int(k)
                         k_name = k
                         if k2int:
                             [t, f] = self.field_id2tablenameandfieldname(database_name, k2int)
-                            k_name = '%%'+t+'|'+f
+                            k_name = '%%' + t + '|' + f
                     except ValueError:
                         k_name = k
                         k_previous = k
-                    #Cas de clé du dictionnaire qui sont du json encodé
+                    # Cas de clé du dictionnaire qui sont du json encodé
                     if not k2int:
                         try:
                             k_data = json.loads(k)
                             if k_data[0] == 'ref' and k_data[1][0] == 'field':
                                 [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
-                                k_data[1][1] = '%%'+t+'|'+f
-                                k_name = '%JSONCONV%'+json.dumps(k_data)
+                                k_data[1][1] = '%%' + t + '|' + f
+                                k_name = '%JSONCONV%' + json.dumps(k_data)
                             else:
                                 k_name = k
                         except json.decoder.JSONDecodeError:
@@ -578,35 +590,35 @@ class MetabaseApi:
                         id = obj_res.pop(k)
                         if id:
                             [t, f] = self.field_id2tablenameandfieldname(database_name, int(id))
-                            obj_res['field_name'] = '%'+k+'%'+t+'|'+f
+                            obj_res['field_name'] = '%' + k + '%' + t + '|' + f
                     elif k in ['table_id', 'source-table']:
                         id = obj_res.pop(k)
                         if id:
                             try:
                                 t = self.table_id2name(database_name, int(id))
-                                obj_res['table_name'] = '%'+k+'%'+t
+                                obj_res['table_name'] = '%' + k + '%' + t
                             except ValueError:
                                 if id[0:6] == 'card__':
                                     c = self.card_id2name(database_name, int(id[6:]))
-                                    obj_res['pseudo_table_card_name'] = '%'+k+'%'+c
-                    elif k == 'card_id':
+                                    obj_res['pseudo_table_card_name'] = '%' + k + '%' + c
+                    elif k in ['card_id', 'targetId']:
                         id = obj_res.pop(k)
                         if id:
                             n = self.card_id2name(database_name, int(id))
-                            obj_res['card_name'] = '%'+k+'%'+n
+                            obj_res['card_name'] = '%' + k + '%' + n
                     elif k in ['database_id', 'database']:
                         if obj.get(k):
                             obj_res.pop(k)
-                            obj_res['database_name'] = '%'+k+'%'
+                            obj_res['database_name'] = '%' + k + '%'
                     elif k == 'collection_id':
                         obj_res.pop(k)
-                        obj_res['collection_name'] = '%'+k+'%'
+                        obj_res['collection_name'] = '%' + k + '%'
                     elif k == 'dashboard_id':
                         id = obj_res.pop(k)
                         name = self.dashboard_id2name(database_name, id)
                         if not name:
-                            raise Exception("no name for dashboard "+str(id))
-                        obj_res['dashboard_name'] = '%'+k+'%'+name
+                            raise Exception("no name for dashboard " + str(id))
+                        obj_res['dashboard_name'] = '%' + k + '%' + name
         return obj_res
 
     def export_dashboards_to_json(self, database_name, dirname):
@@ -614,7 +626,8 @@ class MetabaseApi:
         for dash in export:
             if len(dash['ordered_cards']):
                 dash = self.clean_object(dash)
-                with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+                with open(dirname + "/dashboard_" + dash['name'].replace('/', '') + ".json", 'w',
+                          newline='') as jsonfile:
                     jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None)))
 
     def clean_object(self, object):
@@ -653,27 +666,27 @@ class MetabaseApi:
         export = self.get_snippets(database_name)
         for sn in export:
             sn = self.clean_object(sn)
-            with open(dirname+"/snippet_"+sn['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+            with open(dirname + "/snippet_" + sn['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
                 jsonfile.write(json.dumps(self.convert_ids2names(database_name, sn, None)))
 
     def export_cards_to_json(self, database_name, dirname):
         export = self.get_cards(database_name)
         for card in export:
             card = self.clean_object(card)
-            with open(dirname+"/card_"+card['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+            with open(dirname + "/card_" + card['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
                 jsonfile.write(json.dumps(self.convert_ids2names(database_name, card, None)))
 
     def export_metrics_to_json(self, database_name, dirname):
         export = self.get_metrics(database_name)
         for metric in export:
             metric = self.clean_object(metric)
-            with open(dirname+"/metric_"+metric['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
+            with open(dirname + "/metric_" + metric['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
                 jsonfile.write(json.dumps(self.convert_ids2names(database_name, metric, None)))
 
     def dashboard_import(self, database_name, dash_from_json):
         dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
         if dashid:
-            return self.query('PUT', 'dashboard/'+str(dashid), dash_from_json)
+            return self.query('PUT', 'dashboard/' + str(dashid), dash_from_json)
         self.dashboards_name2id = None
         return self.query('POST', 'dashboard', dash_from_json)
 
@@ -682,7 +695,7 @@ class MetabaseApi:
             snippet_from_json['description'] = None
         snippetid = self.snippet_name2id(database_name, snippet_from_json['name'])
         if snippetid:
-            return self.query('PUT', 'native-query-snippet/'+str(snippetid), snippet_from_json)
+            return self.query('PUT', 'native-query-snippet/' + str(snippetid), snippet_from_json)
         self.snippets_name2id = {}
         return self.query('POST', 'native-query-snippet', snippet_from_json)
 
@@ -691,15 +704,15 @@ class MetabaseApi:
             card_from_json['description'] = None
         cardid = self.card_name2id(database_name, card_from_json['name'])
         if cardid:
-            return self.query('PUT', 'card/'+str(cardid), card_from_json)
+            return self.query('PUT', 'card/' + str(cardid), card_from_json)
         self.cards_name2id = {}
         return self.query('POST', 'card', card_from_json)
 
     def metric_import(self, database_name, metric_from_json):
         metricid = self.metric_name2id(database_name, metric_from_json['name'])
-        metric_from_json['revision_message'] = "Import du "+datetime.datetime.now().isoformat()
+        metric_from_json['revision_message'] = "Import du " + datetime.datetime.now().isoformat()
         if metricid:
-            return self.query('PUT', 'metric/'+str(metricid), metric_from_json)
+            return self.query('PUT', 'metric/' + str(metricid), metric_from_json)
         self.metrics_name2id = {}
         return self.query('POST', 'metric', metric_from_json)
 
@@ -728,9 +741,9 @@ class MetabaseApi:
         if cardid:
             ordered_card_from_json['cardId'] = cardid
             ordered_card_from_json.pop('card')
-        return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
+        return self.query('POST', 'dashboard/' + str(dashid) + '/cards', ordered_card_from_json)
 
-    def import_snippets_from_json(self, database_name, dirname, collection_name = None):
+    def import_snippets_from_json(self, database_name, dirname, collection_name=None):
         res = []
         jsondata = self.get_json_data('snippet_', dirname)
         if len(jsondata):
@@ -742,18 +755,18 @@ class MetabaseApi:
                     res.append(self.snippet_import(database_name, data))
                 except ValueError as e:
                     if not errors:
-                        errors = ValueError(snippet['name']+": "+ str(e))
+                        errors = ValueError(snippet['name'] + ": " + str(e))
                     else:
-                        errors = ValueError(snippet['name']+": "+str(errors) + " ;\n" + str(e))
+                        errors = ValueError(snippet['name'] + ": " + str(errors) + " ;\n" + str(e))
             if errors:
                 raise errors
         return res
 
-    def import_cards_from_json(self, database_name, dirname, collection_name = None):
+    def import_cards_from_json(self, database_name, dirname, collection_name=None):
         res = []
         cards = self.get_json_data('card_', dirname)
-        for dash in self.get_json_data('dashboard_', dirname):
-            for embed_card in dash['ordered_cards']:
+        for dash in self.get_json_data('dashboard_', dirname)[:1]:
+            for embed_card in dash['ordered_cards'][:1]:
                 if embed_card and embed_card['card']:
                     cards.append(embed_card['card'])
         if len(cards):
@@ -791,19 +804,19 @@ class MetabaseApi:
         files = []
         for file in os.listdir(dirname):
             if file.find(prefix) > -1:
-                files.append(dirname+'/'+file)
+                files.append(dirname + '/' + file)
         return files
 
     def get_json_data(self, prefix, dirname):
         jsondata = []
         for filename in self.importfiles_from_dirname(prefix, dirname):
-            with open(filename, 'r', newline = '') as jsonfile:
+            with open(filename, 'r', newline='') as jsonfile:
                 data = json.load(jsonfile)
                 if len(data):
                     jsondata.append(data)
         return jsondata
 
-    def import_metrics_from_json(self, database_name, dirname, collection_name = None):
+    def import_metrics_from_json(self, database_name, dirname, collection_name=None):
         res = []
         jsondata = self.get_json_data('metric_', dirname)
         if jsondata:
@@ -813,14 +826,14 @@ class MetabaseApi:
                     res.append(self.metric_import(database_name, self.convert_names2ids(database_name, None, metric)))
                 except ValueError as e:
                     if not errors:
-                        errors = ValueError(metric['name']+": "+ str(e))
+                        errors = ValueError(metric['name'] + ": " + str(e))
                     else:
-                        errors = ValueError(metric['name']+": "+str(errors) + " ;\n" + str(e))
+                        errors = ValueError(metric['name'] + ": " + str(errors) + " ;\n" + str(e))
             if errors:
                 raise errors
         return res
 
-    def import_dashboards_from_json(self, database_name, dirname, collection_name = None):
+    def import_dashboards_from_json(self, database_name, dirname, collection_name=None):
         res = [[], [], []]
         jsondata = self.get_json_data('dashboard_', dirname)
         if len(jsondata):
@@ -846,13 +859,13 @@ class MetabaseApi:
                 return u['id']
         return None
 
-    def create_user(self, email, password, extra = {}):
+    def create_user(self, email, password, extra={}):
         self.create_session_if_needed()
         extra['email'] = email
         extra['password'] = password
         user_id = self.user_email2id(email)
         if (user_id):
-            return self.query('PUT', 'user/'+str(user_id), extra)
+            return self.query('PUT', 'user/' + str(user_id), extra)
         return self.query('POST', 'user', extra)
 
     def user_password(self, email, password):
@@ -862,8 +875,8 @@ class MetabaseApi:
         data['password'] = password
         user_id = self.user_email2id(email)
         if not user_id:
-            raise ValueError('known user '+email)
-        return self.query('PUT', 'user/'+str(user_id)+'/password', data)
+            raise ValueError('known user ' + email)
+        return self.query('PUT', 'user/' + str(user_id) + '/password', data)
 
     def create_group(self, group_name):
         self.create_session_if_needed()
@@ -910,10 +923,10 @@ class MetabaseApi:
         else:
             group_id = self.group_name2id(group_name)
         if not group_id:
-            raise ValueError("group "+group_name+" not found")
+            raise ValueError("group " + group_name + " not found")
         database_id = self.database_name2id(database_name)
         if not database_id:
-            raise ValueError("database "+database_name+" not found")
+            raise ValueError("database " + database_name + " not found")
         data = self.permission_get_database()
         if not data['groups'].get(group_id):
             data['groups'][group_id] = {}
@@ -941,13 +954,13 @@ class MetabaseApi:
         else:
             group_id = self.group_name2id(group_name)
         if not group_id:
-            raise ValueError("group "+group_name+" not found")
+            raise ValueError("group " + group_name + " not found")
         if collection_name == 'root':
             collection_id = 'root'
         else:
             collection_id = self.collection_name2id(collection_name)
         if not collection_id:
-            raise ValueError("collection "+collection_name+" not found")
+            raise ValueError("collection " + collection_name + " not found")
         data = self.permission_get_collection()
         if not data['groups'].get(group_id):
             data['groups'][group_id] = {}
