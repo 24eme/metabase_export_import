@@ -6,6 +6,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.progress import Progress
 from functools import cache
+import re
 
 
 class MetabaseApi:
@@ -75,7 +76,7 @@ class MetabaseApi:
             raise ConnectionError('unkown method: ' + method + ' (GET,POST,DELETE allowed)')
 
         if self.debug:
-            print(r.text)
+            print('Response:\t', r.text)
 
         try:
             query_response = r.json()
@@ -358,22 +359,27 @@ class MetabaseApi:
                 return d['id']
         return None
 
+    @cache
     def get_snippets(self, database_name):
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'native-query-snippet')
 
+    @cache
     def get_cards(self, database_name):
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'card?f=database&model_id=' + str(database_id))
 
+    @cache
     def get_collections(self):
         self.create_session_if_needed()
         return self.query('GET', 'collection')
 
+    @cache
     def get_dashboard(self, database_name, dashboard_name):
         dashboard_id = self.dashboard_name2id(dashboard_name, dashboard_name)
         return self.query('GET', 'dashboard/' + str(dashboard_id))
 
+    @cache
     def get_dashboards(self, database_name):
         database_id = self.database_name2id(database_name)
         dashbords_light = self.query('GET', 'dashboard')
@@ -574,7 +580,7 @@ class MetabaseApi:
                     if not k2int:
                         try:
                             k_data = json.loads(k)
-                            if k_data[0] == 'ref' and k_data[1][0] == 'field':
+                            if k_data[0] in ('ref', 'dimension') and k_data[1][0] == 'field':
                                 [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
                                 k_data[1][1] = '%%' + t + '|' + f
                                 k_name = '%JSONCONV%' + json.dumps(k_data)
@@ -619,16 +625,29 @@ class MetabaseApi:
                         if not name:
                             raise Exception("no name for dashboard " + str(id))
                         obj_res['dashboard_name'] = '%' + k + '%' + name
+                    elif k == 'id' and isinstance(obj_res, str) and re.match(r'^\["dimension",\["field",\d+,null\]\]$', obj_res[k]):
+                        try:
+                            k_data = json.loads(obj_res[k])
+                            if k_data[0] in ('ref', 'dimension') and k_data[1][0] == 'field':
+                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
+                                k_data[1][1] = '%%' + t + '|' + f
+                                obj_res[k] = '%JSONCONV%' + json.dumps(k_data)
+                        except json.decoder.JSONDecodeError:
+                            pass
+                    else:
+                        obj_res[k] = self.convert_ids2names(database_name, obj[k], previous_key)
         return obj_res
 
-    def export_dashboards_to_json(self, database_name, dirname):
+    def export_dashboards_to_json(self, database_name, dirname, raw: bool = False):
         export = self.get_dashboards(database_name)
         for dash in export:
             if len(dash['ordered_cards']):
                 dash = self.clean_object(dash)
                 with open(dirname + "/dashboard_" + dash['name'].replace('/', '') + ".json", 'w',
                           newline='') as jsonfile:
-                    jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None)))
+                    if not raw:
+                        dash = self.convert_ids2names(database_name, dash, None)
+                    jsonfile.write(json.dumps(dash))
 
     def clean_object(self, object):
         if 'updated_at' in object:
@@ -662,26 +681,32 @@ class MetabaseApi:
             del object['public_uuid']
         return object
 
-    def export_snippet_to_json(self, database_name, dirname):
+    def export_snippet_to_json(self, database_name, dirname, raw: bool = False):
         export = self.get_snippets(database_name)
         for sn in export:
             sn = self.clean_object(sn)
             with open(dirname + "/snippet_" + sn['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, sn, None)))
+                if not raw:
+                    sn = self.convert_ids2names(database_name, sn, None)
+                jsonfile.write(json.dumps(sn))
 
-    def export_cards_to_json(self, database_name, dirname):
+    def export_cards_to_json(self, database_name, dirname, raw: bool = False):
         export = self.get_cards(database_name)
         for card in export:
             card = self.clean_object(card)
             with open(dirname + "/card_" + card['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, card, None)))
+                if not raw:
+                    card = self.convert_ids2names(database_name, card, None)
+                jsonfile.write(json.dumps(card))
 
-    def export_metrics_to_json(self, database_name, dirname):
+    def export_metrics_to_json(self, database_name, dirname, raw: bool = False):
         export = self.get_metrics(database_name)
         for metric in export:
             metric = self.clean_object(metric)
             with open(dirname + "/metric_" + metric['name'].replace('/', '') + ".json", 'w', newline='') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, metric, None)))
+                if not raw:
+                    metric = self.convert_ids2names(database_name, metric, None)
+                jsonfile.write(json.dumps(metric))
 
     def dashboard_import(self, database_name, dash_from_json):
         dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
@@ -724,14 +749,19 @@ class MetabaseApi:
         def delete_card(card):
             return self.query('DELETE', 'dashboard/' + str(dash['id']) + '/cards?dashcardId=' + str(card['id']))
 
-        with ThreadPoolExecutor() as executor:
-            # Submit delete_card function for each card in dash['ordered_cards']
-            futures = [executor.submit(delete_card, card) for card in dash['ordered_cards']]
+        with Progress() as progress:
+            task = progress.add_task(f"[cyan]Deleting cards from dashboard {dash['name']}...",
+                                     total=len(dash['ordered_cards']))
 
-            # Collect the results as tasks complete
-            for future in as_completed(futures):
-                result = future.result()
-                res.append(result)
+            with ThreadPoolExecutor() as executor:
+                # Submit delete_card function for each card in dash['ordered_cards']
+                futures = [executor.submit(delete_card, card) for card in dash['ordered_cards']]
+
+                # Collect the results as tasks complete
+                for future in as_completed(futures):
+                    result = future.result()
+                    res.append(result)
+                    progress.update(task, advance=1)
 
         return res
 
@@ -841,8 +871,14 @@ class MetabaseApi:
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
                 self.dashboard_delete_all_cards(database_name, dash['name'])
-                for ocard in dash['ordered_cards']:
-                    res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
+
+                with Progress() as progress:
+                    task = progress.add_task(f"[cyan]Adding cards to dashboard {dash['name']}...",
+                                             total=len(dash['ordered_cards']))
+
+                    for ocard in dash['ordered_cards']:
+                        res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
+                        progress.update(task, advance=1)
         return res
 
     def get_users(self):

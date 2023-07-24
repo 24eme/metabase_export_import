@@ -8,6 +8,7 @@ app = Typer()
 
 db_name: str
 data_dir: Path
+raw_mode: bool
 metabaseAPI: metabase.MetabaseApi
 
 
@@ -26,17 +27,17 @@ def fields():
 
 @app.command()
 def metrics():
-    metabaseAPI.export_metrics_to_json(db_name, str(data_dir))
+    metabaseAPI.export_metrics_to_json(db_name, str(data_dir), raw_mode)
 
 
 @app.command()
 def cards():
-    metabaseAPI.export_cards_to_json(db_name, str(data_dir))
+    metabaseAPI.export_cards_to_json(db_name, str(data_dir), raw_mode)
 
 
 @app.command()
 def dashboards():
-    metabaseAPI.export_dashboards_to_json(db_name, str(data_dir))
+    metabaseAPI.export_dashboards_to_json(db_name, str(data_dir), raw_mode)
 
 
 @app.callback()
@@ -46,13 +47,15 @@ def common(api_url: Annotated[str, Option(envvar='MB_EXPORT_HOST')],
            database: Annotated[str, Option(envvar='MB_EXPORT_DB')],
            data: Annotated[Path, Option(envvar='MB_DATA_DIR')],
            verbose: bool = False,
-           dry_run: bool = False):
-    global db_name, data_dir, metabaseAPI
+           dry_run: bool = False,
+           raw: bool = False):
+    global db_name, data_dir, metabaseAPI, raw_mode
 
     metabaseAPI = metabase.MetabaseApi(api_url, username, password, verbose, dry_run)
 
     db_name = database
     data_dir = data
+    raw_mode = raw
 
     data_dir.mkdir(exist_ok=True)
 
