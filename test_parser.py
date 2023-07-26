@@ -7,6 +7,8 @@ TEST_FIELD_NAME = 'DUMMY FIELD'
 TEST_FIELD_ID = 99999
 TEST_CARD_NAME = 'DUMMY CARD'
 TEST_CARD_ID = 2222
+TEST_DASHBOARD_NAME = 'DUMMY DASHBOARD'
+TEST_DASHBOARD_ID = 3333
 
 TEST_DB = {
     "tables": [
@@ -30,14 +32,28 @@ TEST_CARDS = [
     }
 ]
 
+TEST_DASHBOARDS = [
+    {
+        "name": TEST_DASHBOARD_NAME,
+        "id": TEST_DASHBOARD_ID,
+    }
+]
+
 
 def create_test_api():
     api = MetabaseApi('', '', '', debug=True, dry_run=True)
     api.database_export = TEST_DB
     api.cards_export = TEST_CARDS
+    api.dashboards_export = TEST_DASHBOARDS
+
     api.cards_name2id = {}
     for card in TEST_CARDS:
         api.cards_name2id[card["name"]] = card["id"]
+
+    api.dashboards_name2id = {}
+    for dashboard in TEST_DASHBOARDS:
+        api.dashboards_name2id[dashboard["name"]] = dashboard["id"]
+
     return api
 
 
@@ -182,6 +198,48 @@ def test_json_keys_and_values():
                 },
             },
         ]
+    }
+
+    api = create_test_api()
+    encoded = api.convert_ids2names('', obj, None)
+    # print(dumps(encoded, indent=4))
+    assert encoded == expected
+
+    decoded = api.convert_names2ids('', '', encoded)
+    assert obj == decoded
+
+
+def test_link_dashboard():
+    obj = {
+        "ordered_cards": [
+            {
+                "visualization_settings": {
+                    "link": {
+                        "entity": {
+                            "model": "dashboard",
+                            "id": TEST_DASHBOARD_ID,
+                        }
+                    }
+                },
+                "dashboard_id": TEST_DASHBOARD_ID,
+            },
+        ],
+    }
+
+    expected = {
+        "ordered_cards": [
+            {
+                "visualization_settings": {
+                    "link": {
+                        "entity": {
+                            "model": "dashboard",
+                            "dashboard_name": f"%id%{TEST_DASHBOARD_NAME}",
+                        }
+                    }
+                },
+                "dashboard_name": f"%dashboard_id%{TEST_DASHBOARD_NAME}",
+            },
+        ],
     }
 
     api = create_test_api()

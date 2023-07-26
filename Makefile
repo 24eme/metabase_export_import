@@ -19,7 +19,7 @@ import:
 	python3 metabase_import.py ${FLAGS} all ${COLLECTION}
 
 clean:
-	rm -rf data
+	rm -rf ${MB_DATA_DIR}
 
 test:
 	python3 -m pytest --verbose -v -s -k $(or ${TEST_FUNC},'') .

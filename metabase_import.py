@@ -1,7 +1,8 @@
 import metabase
 from pathlib import Path
 
-from typer import Typer, Option
+from typer import Typer, Option, Argument
+from typing import Optional
 from typing_extensions import Annotated
 
 app = Typer()
@@ -20,8 +21,8 @@ def import_all(collection: str):
 
 
 @app.command()
-def fields():
-    metabaseAPI.import_fields_from_csv(db_name, str(data_dir))
+def fields(field_ids: Annotated[Optional[list[str]], Argument()] = None):
+    metabaseAPI.import_fields_from_csv(db_name, str(data_dir), field_ids)
 
 
 @app.command()

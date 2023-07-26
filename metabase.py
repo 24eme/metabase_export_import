@@ -5,7 +5,6 @@ import datetime
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.progress import Progress
-from functools import cache
 import re
 
 
@@ -21,6 +20,7 @@ class MetabaseApi:
         self.database_export = None
         self.cards_export = None
         self.metrics_export = None
+        self.dashboards_export = None
         self.dashboards_name2id = None
         self.cards_name2id = {}
         self.snippets_name2id = {}
@@ -111,7 +111,6 @@ class MetabaseApi:
             return;
         self.create_session()
 
-    @cache
     def get_databases(self, full_info=False):
         self.create_session_if_needed()
         url = 'database'
@@ -131,7 +130,6 @@ class MetabaseApi:
                           {"name": name, 'engine': engine, "details": details, "is_full_sync": is_full_sync,
                            "is_on_demand": is_on_demand, "auto_run_queries": auto_run_queries})
 
-    @cache
     def get_database(self, name, full_info=False, check_if_exists=True):
         name2database = {}
         for database in self.get_databases():
@@ -154,12 +152,10 @@ class MetabaseApi:
             return
         return self.query('DELETE', 'database/' + str(data['id']), {'id': data['id']})
 
-    @cache
     def get_all_tables(self):
         self.create_session_if_needed()
         return self.query('GET', 'table')
 
-    @cache
     def get_tables_of_database(self, database_name):
         self.create_session_if_needed()
         result = self.get_database(database_name, True)
@@ -168,14 +164,12 @@ class MetabaseApi:
         except KeyError:
             return {}
 
-    @cache
     def get_table(self, database_name, table_name):
         for t in self.get_tables_of_database(database_name):
             if t['name'] == table_name:
                 return t
         table = {}
 
-    @cache
     def get_field(self, database_name, table_name, field_name):
         table = self.get_table(database_name, table_name)
         try:
@@ -190,7 +184,8 @@ class MetabaseApi:
         self.query('DELETE', 'session', {'metabase-session-id': self.metabase_session})
         self.metabase_session = None
 
-    def field_id2tablenameandfieldname(self, database_name, field_id):
+    def field_id2fullname(self, database_name, field_id):
+        # TODO: Support schemas, same table name in different schemas might cause issues
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
         if not field_id:
@@ -227,7 +222,15 @@ class MetabaseApi:
                 return metric['name']
         return ''
 
-    def field_tablenameandfieldname2field(self, database_name, table_name, field_name):
+    def dashboard_id2name(self, database_name, dashboard_id):
+        if self.dashboards_export is None:
+            self.dashboards_export = self.get_dashboards(database_name)
+        for dashboard in self.dashboards_export:
+            if dashboard['id'] == dashboard_id:
+                return dashboard['name']
+        return None
+
+    def field_fullname2id(self, database_name, table_name, field_name):
         if self.database_export is None:
             self.database_export = self.get_database(database_name, True)
         if not table_name or not field_name:
@@ -262,18 +265,19 @@ class MetabaseApi:
             table_name = table['name']
             for field in table['fields']:
                 field_id = field['fk_target_field_id']
-                [fk_table, fk_field] = self.field_id2tablenameandfieldname(database_name, field_id)
+                [fk_table, fk_field] = self.field_id2fullname(database_name, field_id)
                 if not field['semantic_type']:
                     field['semantic_type'] = ''
                 if not field['custom_position']:
                     field['custom_position'] = ''
                 result.append({
-                    'table_name': table_name, 'field_name': field['name'], 'description': field['description'],
+                    'table_name': table_name, 'field_name': field['name'],
+                    'description': field['description'],
                     'semantic_type': field['semantic_type'],
                     'foreign_table': fk_table, 'foreign_field': fk_field,
                     'visibility_type': field['visibility_type'], 'has_field_values': field['has_field_values'],
                     'custom_position': field['custom_position'], 'effective_type': field['effective_type'],
-                    'base_type': field['base_type'], 'database_type': field['database_type'], 'field_id': field['id']
+                    'base_type': field['base_type'], 'database_type': field['database_type'], 'field_id': field['id'],
                 })
         return result
 
@@ -290,11 +294,13 @@ class MetabaseApi:
                     need_header = False
                 my_writer.writerow(row.values())
 
-    def import_fields_from_csv(self, database_name, dirname):
+    def import_fields_from_csv(self, database_name, dirname, field_ids: list[str]):
         fields = []
         with open(dirname + "/fields.csv", newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                if field_ids and row['field_id'] not in field_ids:
+                    continue
                 fields.append(row)
         return self.update_fields(database_name, fields)
 
@@ -329,14 +335,14 @@ class MetabaseApi:
         return output
 
     def update_field(self, database_name, field):
-        field_from_api = self.field_tablenameandfieldname2field(database_name, field['table_name'], field['field_name'])
+        field_from_api = self.field_fullname2id(database_name, field['table_name'], field['field_name'])
         if not field_from_api:
             return None
-        fk = self.field_tablenameandfieldname2field(database_name, field['foreign_table'], field['foreign_field'])
+        fk = self.field_fullname2id(database_name, field['foreign_table'], field['foreign_field'])
         field.pop('foreign_table')
         field.pop('foreign_field')
         data = {'id': str(field_from_api['id'])}
-        for k in field.keys():
+        for k in sorted(field.keys()):
             if field[k]:
                 data[k] = field[k]
             else:
@@ -345,7 +351,6 @@ class MetabaseApi:
             data['fk_target_field_id'] = fk['id']
         return self.query('PUT', 'field/' + data['id'], data)
 
-    @cache
     def database_name2id(self, database_name):
         # TODO: Optimize with cache
         self.create_session_if_needed()
@@ -359,27 +364,22 @@ class MetabaseApi:
                 return d['id']
         return None
 
-    @cache
     def get_snippets(self, database_name):
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'native-query-snippet')
 
-    @cache
     def get_cards(self, database_name):
         database_id = self.database_name2id(database_name)
         return self.query('GET', 'card?f=database&model_id=' + str(database_id))
 
-    @cache
     def get_collections(self):
         self.create_session_if_needed()
         return self.query('GET', 'collection')
 
-    @cache
     def get_dashboard(self, database_name, dashboard_name):
         dashboard_id = self.dashboard_name2id(dashboard_name, dashboard_name)
         return self.query('GET', 'dashboard/' + str(dashboard_id))
 
-    @cache
     def get_dashboards(self, database_name):
         database_id = self.database_name2id(database_name)
         dashbords_light = self.query('GET', 'dashboard')
@@ -416,13 +416,6 @@ class MetabaseApi:
                     continue
                 self.dashboards_name2id[d['name']] = d['id']
         return self.dashboards_name2id.get(dashboard_name)
-
-    def dashboard_id2name(self, database_name, dashboard_id):
-        self.dashboard_name2id(database_name, "a")
-        for dname in self.dashboards_name2id.keys():
-            if self.dashboards_name2id[dname] == dashboard_id:
-                return dname
-        return None
 
     def snippet_name2id(self, database_name, snippet_name):
         if not self.snippets_name2id:
@@ -502,7 +495,7 @@ class MetabaseApi:
                 return [new_k, metricid]
             raise ValueError('metric not found: ' + resplit[2])
         if len(resplit) == 2:
-            field = self.field_tablenameandfieldname2field(database_name, resplit[0], resplit[1])
+            field = self.field_fullname2id(database_name, resplit[0], resplit[1])
             if field:
                 return [new_k, field['id']]
             raise ValueError('field not found: ' + resplit[0] + '/' + resplit[1])
@@ -523,7 +516,7 @@ class MetabaseApi:
                     obj_res[i] = self.convert_names2ids(database_name, collection_name, obj[i])
         elif isinstance(obj, dict):
             obj_res = obj.copy()
-            for k in obj.keys():
+            for k in sorted(obj.keys()):
                 if k[0] == '%':
                     try:
                         [new_k, value] = self.convert_pcnames2id(database_name, collection_name, None, k)
@@ -547,7 +540,7 @@ class MetabaseApi:
             if len(obj):
                 try:
                     if obj[0] == 'field':
-                        [t, f] = self.field_id2tablenameandfieldname(database_name, int(obj_res[1]))
+                        [t, f] = self.field_id2fullname(database_name, int(obj_res[1]))
                         obj_res[1] = '%%' + t + '|' + f
                     elif obj[0] == 'metric':
                         m = self.metric_id2name(database_name, int(obj_res[1]))
@@ -559,7 +552,7 @@ class MetabaseApi:
                     obj_res[1] = obj[1]
         elif isinstance(obj, dict):
             obj_res = obj.copy()
-            for k in obj.keys():
+            for k in sorted(obj.keys()):
                 if k == 'collection':
                     obj_res.pop(k)
                     continue
@@ -571,7 +564,7 @@ class MetabaseApi:
                         k2int = int(k)
                         k_name = k
                         if k2int:
-                            [t, f] = self.field_id2tablenameandfieldname(database_name, k2int)
+                            [t, f] = self.field_id2fullname(database_name, k2int)
                             k_name = '%%' + t + '|' + f
                     except ValueError:
                         k_name = k
@@ -581,7 +574,7 @@ class MetabaseApi:
                         try:
                             k_data = json.loads(k)
                             if k_data[0] in ('ref', 'dimension') and k_data[1][0] == 'field':
-                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
+                                [t, f] = self.field_id2fullname(database_name, int(k_data[1][1]))
                                 k_data[1][1] = '%%' + t + '|' + f
                                 k_name = '%JSONCONV%' + json.dumps(k_data)
                             else:
@@ -595,7 +588,7 @@ class MetabaseApi:
                     if k in ['field_id'] or (k == 'id' and previous_key in ['result_metadata', 'param_fields']):
                         id = obj_res.pop(k)
                         if id:
-                            [t, f] = self.field_id2tablenameandfieldname(database_name, int(id))
+                            [t, f] = self.field_id2fullname(database_name, int(id))
                             obj_res['field_name'] = '%' + k + '%' + t + '|' + f
                     elif k in ['table_id', 'source-table']:
                         id = obj_res.pop(k)
@@ -619,17 +612,18 @@ class MetabaseApi:
                     elif k == 'collection_id':
                         obj_res.pop(k)
                         obj_res['collection_name'] = '%' + k + '%'
-                    elif k == 'dashboard_id':
+                    elif k == 'dashboard_id' or (k == 'id' and previous_key in ['entity']):
                         id = obj_res.pop(k)
                         name = self.dashboard_id2name(database_name, id)
                         if not name:
                             raise Exception("no name for dashboard " + str(id))
                         obj_res['dashboard_name'] = '%' + k + '%' + name
-                    elif k == 'id' and isinstance(obj_res, str) and re.match(r'^\["dimension",\["field",\d+,null\]\]$', obj_res[k]):
+                    elif k == 'id' and isinstance(obj_res[k], str) and re.match(
+                            r'^\["dimension",\["field",\d+,null\]\]$', obj_res[k]):
                         try:
                             k_data = json.loads(obj_res[k])
                             if k_data[0] in ('ref', 'dimension') and k_data[1][0] == 'field':
-                                [t, f] = self.field_id2tablenameandfieldname(database_name, int(k_data[1][1]))
+                                [t, f] = self.field_id2fullname(database_name, int(k_data[1][1]))
                                 k_data[1][1] = '%%' + t + '|' + f
                                 obj_res[k] = '%JSONCONV%' + json.dumps(k_data)
                         except json.decoder.JSONDecodeError:
