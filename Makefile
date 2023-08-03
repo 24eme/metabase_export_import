@@ -13,13 +13,23 @@ ifeq ($(VERBOSE),1)
 endif
 
 export:
-	python3 metabase_export.py ${FLAGS} all
+	poetry run metabase_export.py ${FLAGS} all
 
 import:
-	python3 metabase_import.py ${FLAGS} all ${COLLECTION}
+	poetry run metabase_import.py ${FLAGS} all ${COLLECTION}
 
 clean:
 	rm -rf ${MB_DATA_DIR}
 
+format:
+	poetry run isort .
+
+lint: format
+	poetry run flake8 --max-line-length=140 .
+	git diff --quiet --exit-code
+
 test:
-	python3 -m pytest --verbose -v -s -k $(or ${TEST_FUNC},'') .
+	poetry run pytest --verbose -v -s -k $(or ${TEST_FUNC},'') .
+
+install:
+	poetry install --verbose

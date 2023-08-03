@@ -1,5 +1,6 @@
 from metabase import MetabaseApi
-from json import dumps
+
+# from json import dumps
 
 TEST_TABLE_NAME = 'DUMMY TABLE'
 TEST_TABLE_ID = 111

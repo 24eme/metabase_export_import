@@ -1,11 +1,12 @@
-import requests
-import json
 import csv
 import datetime
+import json
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from rich.progress import Progress
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import requests
+from rich.progress import Progress
 
 
 class MetabaseApi:
@@ -108,7 +109,7 @@ class MetabaseApi:
 
     def create_session_if_needed(self):
         if self.metabase_session:
-            return;
+            return
         self.create_session()
 
     def get_databases(self, full_info=False):
@@ -168,7 +169,7 @@ class MetabaseApi:
         for t in self.get_tables_of_database(database_name):
             if t['name'] == table_name:
                 return t
-        table = {}
+        return {}
 
     def get_field(self, database_name, table_name, field_name):
         table = self.get_table(database_name, table_name)
@@ -365,7 +366,7 @@ class MetabaseApi:
         return None
 
     def get_snippets(self, database_name):
-        database_id = self.database_name2id(database_name)
+        _ = self.database_name2id(database_name)
         return self.query('GET', 'native-query-snippet')
 
     def get_cards(self, database_name):
@@ -880,7 +881,7 @@ class MetabaseApi:
         users = self.query('GET', 'user?status=all')
         try:
             return users['data']
-        except:
+        except KeyError:
             return None
 
     def user_email2id(self, user_email):
@@ -914,11 +915,7 @@ class MetabaseApi:
 
     def get_groups(self):
         self.create_session_if_needed()
-        groups = self.query('GET', 'permissions/group')
-        try:
-            return groups
-        except:
-            return None
+        return self.query('GET', 'permissions/group')
 
     def group_name2id(self, group_name):
         for g in self.get_groups():
@@ -977,7 +974,7 @@ class MetabaseApi:
         return self.query('GET', 'collection/graph')
 
     def permission_set_collection(self, group_name, collection_name, right):
-        if not right in ['read', 'write', 'none']:
+        if right not in ['read', 'write', 'none']:
             raise ValueError('right not read/write/none')
         if group_name == 'all':
             group_id = '1'

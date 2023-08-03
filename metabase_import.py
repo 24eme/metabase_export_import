@@ -1,9 +1,10 @@
-import metabase
 from pathlib import Path
-
-from typer import Typer, Option, Argument
 from typing import Optional
+
+from typer import Argument, Option, Typer
 from typing_extensions import Annotated
+
+import metabase
 
 app = Typer()
 

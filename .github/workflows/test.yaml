@@ -1,0 +1,36 @@
+name: 'Test'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Installing python directly due to poetry issue with upstream python
+      # https://github.com/python-poetry/poetry/issues/7343
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.4.2
+          virtualenvs-create: false
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run test
+        run: make test

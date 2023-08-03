@@ -1,5 +1,6 @@
-import metabase
 import sys
+
+import metabase
 
 metabase_apiurl = sys.argv[1]
 metabase_username = sys.argv[2]
@@ -11,9 +12,9 @@ user_to_create = sys.argv[7]
 pass_to_create = sys.argv[8]
 
 ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_password)
-#ametabase.debug = True
+# ametabase.debug = True
 
-#ametabase.delete_database('base')
+# ametabase.delete_database('base')
 #
 ametabase.create_database(metabase_basename, 'sqlite', {'db': sqlite_database_path_to_create})
 
