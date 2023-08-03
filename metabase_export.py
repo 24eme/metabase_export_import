@@ -1,22 +1,69 @@
+from pathlib import Path
+
+from typer import Option, Typer
+from typing_extensions import Annotated
+
 import metabase
-import sys
-import os
 
-metabase_apiurl = sys.argv[1]
-metabase_username = sys.argv[2]
-metabase_password = sys.argv[3]
-metabase_base = sys.argv[4]
-metabase_exportdir = sys.argv[5]
+app = Typer()
 
-ametabase = metabase.MetabaseApi(metabase_apiurl, metabase_username, metabase_password)
-#ametabase.debug = True
+db_name: str
+data_dir: Path
+raw_mode: bool
+metabaseAPI: metabase.MetabaseApi
 
-try:
-    os.mkdir("export")
-except:
-    None
 
-ametabase.export_fields_to_csv(metabase_base, metabase_exportdir)
-ametabase.export_cards_to_json(metabase_base, metabase_exportdir)
-ametabase.export_dashboards_to_json(metabase_base, metabase_exportdir)
-ametabase.export_metrics_to_json(metabase_base, metabase_exportdir)
+@app.command('all')
+def export_all():
+    fields()
+    cards()
+    dashboards()
+    metrics()
+
+
+@app.command()
+def fields():
+    metabaseAPI.export_fields_to_csv(db_name, str(data_dir))
+
+
+@app.command()
+def metrics():
+    metabaseAPI.export_metrics_to_json(db_name, str(data_dir), raw_mode)
+
+
+@app.command()
+def cards():
+    metabaseAPI.export_cards_to_json(db_name, str(data_dir), raw_mode)
+
+
+@app.command()
+def dashboards():
+    metabaseAPI.export_dashboards_to_json(db_name, str(data_dir), raw_mode)
+
+
+@app.callback()
+def common(api_url: Annotated[str, Option(envvar='MB_EXPORT_HOST')],
+           username: Annotated[str, Option(envvar='MB_EXPORT_USERNAME')],
+           password: Annotated[str, Option(envvar='MB_EXPORT_PASSWORD')],
+           database: Annotated[str, Option(envvar='MB_EXPORT_DB')],
+           data: Annotated[Path, Option(envvar='MB_DATA_DIR')],
+           verbose: bool = False,
+           dry_run: bool = False,
+           raw: bool = False):
+    global db_name, data_dir, metabaseAPI, raw_mode
+
+    metabaseAPI = metabase.MetabaseApi(api_url, username, password, verbose, dry_run)
+
+    db_name = database
+    data_dir = data
+    raw_mode = raw
+
+    data_dir.mkdir(exist_ok=True)
+
+
+def main():
+    app()
+
+
+if __name__ == '__main__':
+    main()
