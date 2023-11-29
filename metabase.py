@@ -139,6 +139,15 @@ class MetabaseApi:
             return
         return self.query('DELETE', 'database/'+str(data['id']), {'id': data['id']})
 
+    def sync_scan_database(self, name):
+        self.create_session_if_needed()
+        data = self.get_database(name, False, False)
+        if not data:
+            return
+
+        self.query('POST', 'database/'+str(data['id'])+'/sync_schema', {'id': data['id']});
+        self.query('POST', 'database/'+str(data['id'])+'/rescan_values', {'id': data['id']});
+
     def get_all_tables(self):
         self.create_session_if_needed()
         return self.query('GET', 'table')
