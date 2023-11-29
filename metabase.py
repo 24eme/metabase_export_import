@@ -272,7 +272,7 @@ class MetabaseApi:
         if not export:
             return
         with open(dirname+"/fields.csv", 'w', newline = '') as csvfile:
-            my_writer = csv.writer(csvfile, delimiter = ',')
+            my_writer = csv.writer(csvfile, delimiter = ',', lineterminator='\n')
             need_header = True
             for row in export:
                 if need_header:
