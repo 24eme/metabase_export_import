@@ -346,10 +346,11 @@ class MetabaseApi:
         for d in dashbords_light:
             res = self.query('GET', 'dashboard/'+str(d['id']))
             good_db = True
-            for c in res['ordered_cards']:
-                if c['card'].get('database_id') and c['card'].get('database_id') != database_id:
-                    good_db = False
-                    continue
+            if 'dashcards' in res:
+                for c in res['dashcards']:
+                    if c['card'].get('database_id') and c['card'].get('database_id') != database_id:
+                        good_db = False
+                        continue
             if not good_db:
                 continue
             dashboards.append(res)
@@ -586,7 +587,8 @@ class MetabaseApi:
     def export_dashboards_to_json(self, database_name, dirname):
         export = self.get_dashboards(database_name)
         for dash in export:
-            if len(dash['ordered_cards']):
+            print(dash)
+            if len(dash['dashcards']):
                 dash = self.clean_object(dash)
                 with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
                     jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None)))
@@ -604,9 +606,10 @@ class MetabaseApi:
             del object['last-edit-info']
         if 'result_metadata' in object and object['result_metadata']:
             for i in range(0, len(object['result_metadata'])):
-                del object['result_metadata'][i]['fingerprint']
-        if 'ordered_cards' in object:
-            for c in object['ordered_cards']:
+                if 'fingerprint' in object['result_metadata'][i]:
+                    del object['result_metadata'][i]['fingerprint']
+        if 'dashcards' in object:
+            for c in object['dashcards']:
                 c = self.clean_object(c)
         if 'card' in object:
             object['card'] = self.clean_object(object['card'])
@@ -679,7 +682,7 @@ class MetabaseApi:
     def dashboard_delete_all_cards(self, database_name, dashboard_name):
         dash = self.get_dashboard(database_name, dashboard_name)
         res = []
-        for c in dash['ordered_cards']:
+        for c in dash['dashcards']:
             res.append(self.query('DELETE', 'dashboard/'+str(dash['id'])+'/cards?dashcardId='+str(c['id'])))
         return res
 
@@ -714,7 +717,7 @@ class MetabaseApi:
         res = []
         jsondata = self.get_json_data('card_', dirname)
         for dash in self.get_json_data('dashboard_', dirname):
-            for embed_card in dash['ordered_cards']:
+            for embed_card in dash['dashcards']:
                 if embed_card and embed_card['card']:
                     jsondata.append(embed_card['card'])
         if len(jsondata):
@@ -772,7 +775,7 @@ class MetabaseApi:
             for dash in jsondata:
                 res[0].append(self.dashboard_import(database_name, dash))
                 self.dashboard_delete_all_cards(database_name, dash['name'])
-                for ocard in dash['ordered_cards']:
+                for ocard in dash['dashcards']:
                     res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
         return res
 
