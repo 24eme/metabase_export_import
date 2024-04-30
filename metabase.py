@@ -587,7 +587,6 @@ class MetabaseApi:
     def export_dashboards_to_json(self, database_name, dirname):
         export = self.get_dashboards(database_name)
         for dash in export:
-            print(dash)
             if len(dash['dashcards']):
                 dash = self.clean_object(dash)
                 with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
@@ -610,6 +609,7 @@ class MetabaseApi:
                     del object['result_metadata'][i]['fingerprint']
         if 'dashcards' in object:
             for c in object['dashcards']:
+                del c['card']
                 c = self.clean_object(c)
         if 'card' in object:
             object['card'] = self.clean_object(object['card'])
@@ -679,21 +679,6 @@ class MetabaseApi:
         self.metrics_name2id = {}
         return self.query('POST', 'metric', metric_from_json)
 
-    def dashboard_delete_all_cards(self, database_name, dashboard_name):
-        dash = self.get_dashboard(database_name, dashboard_name)
-        res = []
-        for c in dash['dashcards']:
-            res.append(self.query('DELETE', 'dashboard/'+str(dash['id'])+'/cards?dashcardId='+str(c['id'])))
-        return res
-
-    def dashboard_import_card(self, database_name, dashboard_name, ordered_card_from_json):
-        dashid = self.dashboard_name2id(database_name, dashboard_name)
-        cardid = ordered_card_from_json.get('card_id')
-        if cardid:
-            ordered_card_from_json['cardId'] = cardid
-            ordered_card_from_json.pop('card')
-        return self.query('POST', 'dashboard/'+str(dashid)+'/cards', ordered_card_from_json)
-
     def import_snippets_from_json(self, database_name, dirname, collection_name = None):
         res = []
         jsondata = self.get_json_data('snippet_', dirname)
@@ -716,12 +701,10 @@ class MetabaseApi:
     def import_cards_from_json(self, database_name, dirname, collection_name = None):
         res = []
         jsondata = self.get_json_data('card_', dirname)
-        for dash in self.get_json_data('dashboard_', dirname):
-            for embed_card in dash['dashcards']:
-                if embed_card and embed_card['card']:
-                    jsondata.append(embed_card['card'])
         if len(jsondata):
             errors = None
+            # sort cards to put models first
+            jsondata.sort(key=lambda card: card['type'] != 'model')
             for card in jsondata:
                 try:
                     res.append(self.card_import(database_name, self.convert_names2ids(database_name, collection_name, card)))
@@ -768,15 +751,22 @@ class MetabaseApi:
         return res
 
     def import_dashboards_from_json(self, database_name, dirname, collection_name = None):
-        res = [[], [], []]
+        res = [[], []]
         jsondata = self.get_json_data('dashboard_', dirname)
         if len(jsondata):
             jsondata = self.convert_names2ids(database_name, collection_name, jsondata)
             for dash in jsondata:
-                res[0].append(self.dashboard_import(database_name, dash))
-                self.dashboard_delete_all_cards(database_name, dash['name'])
+                # Create or update dashboard with no cards
+                empty_cards=dash.copy()
+                empty_cards['dashcards'] = []
+                res[0].append(self.dashboard_import(database_name, empty_cards))
+
+                # Update dashboard with cards (and negative id)
+                i=1
                 for ocard in dash['dashcards']:
-                    res[1].append(self.dashboard_import_card(database_name, dash['name'], ocard))
+                    ocard['id'] = -i
+                    i += 1
+                res[1].append(self.dashboard_import(database_name, dash))
         return res
 
     def get_users(self):
