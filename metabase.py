@@ -274,6 +274,7 @@ class MetabaseApi:
         with open(dirname+"/fields.csv", 'w', newline = '') as csvfile:
             my_writer = csv.writer(csvfile, delimiter = ',', lineterminator='\n')
             need_header = True
+            export.sort(key=lambda x: [x['table_name'],x['field_name']])
             for row in export:
                 if need_header:
                     my_writer.writerow(row.keys())
@@ -589,7 +590,7 @@ class MetabaseApi:
             if len(dash['ordered_cards']):
                 dash = self.clean_object(dash)
                 with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
-                    jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None)))
+                    jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None), indent=2, sort_keys=True))
 
     def clean_object(self, object):
         if 'updated_at' in object:
@@ -627,21 +628,21 @@ class MetabaseApi:
         for sn in export:
             sn = self.clean_object(sn)
             with open(dirname+"/snippet_"+sn['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, sn, None)))
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, sn, None), indent=2, sort_keys=True))
 
     def export_cards_to_json(self, database_name, dirname):
         export = self.get_cards(database_name)
         for card in export:
             card = self.clean_object(card)
             with open(dirname+"/card_"+card['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, card, None)))
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, card, None), indent=2, sort_keys=True))
 
     def export_metrics_to_json(self, database_name, dirname):
         export = self.get_metrics(database_name)
         for metric in export:
             metric = self.clean_object(metric)
             with open(dirname+"/metric_"+metric['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
-                jsonfile.write(json.dumps(self.convert_ids2names(database_name, metric, None)))
+                jsonfile.write(json.dumps(self.convert_ids2names(database_name, metric, None), indent=2, sort_keys=True))
 
     def dashboard_import(self, database_name, dash_from_json):
         dashid = self.dashboard_name2id(database_name, dash_from_json['name'])
