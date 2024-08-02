@@ -665,6 +665,8 @@ class MetabaseApi:
             card_from_json['description'] = None
         cardid = self.card_name2id(database_name, card_from_json['name'])
         if cardid:
+            if card_from_json.get('delete'):
+                return self.query('DELETE', 'card/'+str(cardid))
             return self.query('PUT', 'card/'+str(cardid), card_from_json)
         self.cards_name2id = {}
         return self.query('POST', 'card', card_from_json)
