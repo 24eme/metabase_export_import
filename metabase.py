@@ -592,36 +592,38 @@ class MetabaseApi:
                 with open(dirname+"/dashboard_"+dash['name'].replace('/', '')+".json", 'w', newline = '') as jsonfile:
                     jsonfile.write(json.dumps(self.convert_ids2names(database_name, dash, None), indent=2, sort_keys=True))
 
-    def clean_object(self, object):
-        if 'updated_at' in object:
-            del object['updated_at']
-        if 'created_at' in object:
-            del object['created_at']
-        if 'id' in object:
-            del object['id']
-        if 'creator' in object:
-            del object['creator']
-        if 'last-edit-info' in object:
-            del object['last-edit-info']
-        if 'result_metadata' in object and object['result_metadata']:
-            for i in range(0, len(object['result_metadata'])):
-                del object['result_metadata'][i]['fingerprint']
-        if 'ordered_cards' in object:
-            for c in object['ordered_cards']:
-                c = self.clean_object(c)
-        if 'card' in object:
-            object['card'] = self.clean_object(object['card'])
-        if 'query_average_duration' in object:
-            del object['query_average_duration']
-        if 'creator_id' in object:
-            del object['creator_id']
-        if 'made_public_by_id' in object:
-            del object['made_public_by_id']
-        if 'param_values' in object:
-            del object['param_values']
-        if 'public_uuid' in object:
-            del object['public_uuid']
-        return object
+def clean_object(self, obj):
+    if not isinstance(obj, dict):
+        return obj  # If obj is not a dictionary, return it as is
+
+    # List of keys to delete if they exist
+    keys_to_delete = [
+        'updated_at', 'created_at', 'id', 'creator', 'last-edit-info',
+        'query_average_duration', 'creator_id', 'made_public_by_id',
+        'param_values', 'public_uuid'
+    ]
+
+    for key in keys_to_delete:
+        obj.pop(key, None)  # Delete key if it exists, do nothing otherwise
+
+    # Clean 'result_metadata' if it exists and is a list
+    if isinstance(obj.get('result_metadata'), list):
+        for item in obj['result_metadata']:
+            if isinstance(item, dict):
+                # Delete 'fingerprint' and 'base_type' if they exist
+                item.pop('fingerprint', None)
+                item.pop('base_type', None)
+
+    # Recursively clean 'ordered_cards' if they exist and are a list
+    if isinstance(obj.get('ordered_cards'), list):
+        for c in obj['ordered_cards']:
+            self.clean_object(c)
+
+    # Recursively clean 'card' if it exists
+    if 'card' in obj:
+        obj['card'] = self.clean_object(obj['card'])
+
+    return obj
 
     def export_snippet_to_json(self, database_name, dirname):
         export = self.get_snippets(database_name)
